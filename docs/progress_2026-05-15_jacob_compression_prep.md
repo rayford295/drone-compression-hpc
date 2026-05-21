@@ -107,6 +107,14 @@ The result root will be:
 /projects/bfod/$USER/cdc-deltaai/output/sc26_compression/$RUN_STAMP/
 ```
 
+If the final summary job is not submitted, submit it after the experiment jobs finish:
+
+```bash
+sbatch --export=ALL,REPO_DIR=/projects/bfod/$USER/cdc-deltaai/code_tiling_fixed,RUN_STAMP=$RUN_STAMP experiments/compression/slurm/06_summarize_all.sbatch
+```
+
+The summary job requests one GPU only because DeltaAI rejects batch jobs that request no GPU resources. The summary script itself only combines CSV files.
+
 ## What to Read After Each Run
 
 Start with:
