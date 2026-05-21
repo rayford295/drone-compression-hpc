@@ -17,6 +17,7 @@ This folder contains the runnable experiment scaffold for the next compression m
 | Final all-run summary | `slurm/06_summarize_all.sbatch` |
 | Jacob compression-side suite, no tiling | `slurm/run_jacob_compression_suite.sh` |
 | Combined tables | `summarize_results.py` |
+| Poster-ready visual panels | `make_poster_panels.py` |
 
 ## Important Compression-Level Finding
 
@@ -94,6 +95,7 @@ The core table columns are:
 | `avg_error_p99` | 99th percentile absolute pixel error |
 | `avg_max_abs_error` | maximum absolute pixel error in the image |
 | `avg_bias_mean` | signed mean reconstruction bias; positive means brighter on average |
+| `avg_error_std` | standard deviation of absolute pixel error |
 | `avg_seam_error_mean` | tiled-only seam artifact metric |
 
 The compressed size is estimated from model BPP:
@@ -124,8 +126,19 @@ For each saved visual example, the runner now saves:
 | `_original_preview.png` | downsampled original image preview |
 | `_error_heatmap.png` | absolute RGB error heatmap, normalized by the 99.5th percentile error |
 | `_comparison.png` | left: original preview; middle: reconstruction preview; right: error heatmap |
+| `_poster_panel.png` | six-panel poster figure: original, reconstruction, hot difference map, histogram, metrics, and distribution |
 
 The heatmap computes the per-pixel mean absolute RGB difference between the original image and the reconstruction. Dark areas mean small differences. Yellow-white areas mark the largest residuals in that image. Because the heatmap uses a robust 99.5th percentile normalization, a few extreme pixels do not hide broad lower-level artifacts.
+
+To generate the poster panels from an existing DeltaAI output folder without rerunning the model:
+
+```bash
+python experiments/compression/make_poster_panels.py \
+  --root /projects/bfod/$USER/cdc-deltaai/output/sc26_compression/20260515_yifan_selected_256_512_n50/03_tiling_sweep \
+  --max_panels 4 \
+  --max_edge 1200 \
+  --overwrite
+```
 
 ## Run on DeltaAI
 

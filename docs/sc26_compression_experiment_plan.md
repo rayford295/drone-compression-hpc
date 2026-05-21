@@ -11,6 +11,7 @@ Make CDC compression fast, scalable, and storage-efficient enough for the SC26 p
 | `experiments/compression/run_compression_experiment.py` | Main runner for one experiment configuration |
 | `experiments/compression/summarize_results.py` | Combines `summary.csv` files into one table |
 | `experiments/compression/inspect_compression_controls.py` | Checks whether compression level is a runtime parameter |
+| `experiments/compression/make_poster_panels.py` | Builds poster-ready original/reconstruction/difference figures from saved visuals |
 | `experiments/compression/configs/deltaai_paths.env` | DeltaAI paths, checkpoint names, and default image counts |
 | `experiments/compression/slurm/01_baseline_resolution_batch.sbatch` | Baseline, batch-size, and resolution sweep |
 | `experiments/compression/slurm/02_checkpoint_level_sweep.sbatch` | Compression-level sweep through checkpoints |
@@ -51,7 +52,7 @@ RUN_STAMP=20260504_meeting_prep N_IMAGES=8 experiments/compression/slurm/run_all
 - native full-resolution images
 - pretrained x-param checkpoint `b0.2048`
 - batch sizes: 1, 2, 4
-- metrics: runtime, peak GPU memory, BPP, compression ratio, PSNR, SSIM, MSE, RMSE, MAE, high-percentile absolute error, mean bias
+- metrics: runtime, peak GPU memory, BPP, compression ratio, PSNR, SSIM, MSE, RMSE, MAE, high-percentile absolute error, mean bias, and error standard deviation
 
 ### Resolution Sweep
 
@@ -123,8 +124,28 @@ Run order:
 Quality checks:
 
 - numeric table: compression ratio, PSNR, SSIM, MSE, RMSE, MAE, `error_p95`, `error_p99`, seam metrics
-- visual table: original preview, reconstruction preview, absolute-error heatmap, side-by-side comparison panel
+- visual table: original preview, reconstruction preview, absolute-error heatmap, side-by-side comparison panel, poster-ready six-panel figure
 - failure mode to watch: regular tile-boundary patterns in heatmaps or seam-region crops
+
+### Poster Visual QA for 2026-05-24
+
+Jooho requested poster figures that compare the original image, reconstructed image, and a hot difference map, with supporting histogram and quality metrics. The runner now saves `*_poster_panel.png` for each saved visual example, and the helper script can backfill those panels from existing DeltaAI `visuals/` folders.
+
+Run this first on the existing selected `N=50` run:
+
+```bash
+python experiments/compression/make_poster_panels.py \
+  --root /projects/bfod/$USER/cdc-deltaai/output/sc26_compression/20260515_yifan_selected_256_512_n50/03_tiling_sweep \
+  --max_panels 4 \
+  --max_edge 1200 \
+  --overwrite
+```
+
+Then run a final selected poster validation before Sunday, 2026-05-24:
+
+```bash
+sbatch --export=ALL,REPO_DIR=/projects/bfod/$USER/cdc-deltaai/code_tiling_fixed,RUN_STAMP=20260522_yifan_poster_256_512_n100,TILING_SIZES="256 512",N_IMAGES=100,SAVE_VISUAL_LIMIT=8 experiments/compression/slurm/03_tiling_sweep.sbatch
+```
 
 ## Main Deliverable Table
 

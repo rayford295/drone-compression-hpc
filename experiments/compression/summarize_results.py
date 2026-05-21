@@ -38,6 +38,7 @@ DEFAULT_COLUMNS = [
     "avg_error_p99",
     "avg_max_abs_error",
     "avg_bias_mean",
+    "avg_error_std",
     "avg_seam_error_mean",
     "storage_label",
 ]

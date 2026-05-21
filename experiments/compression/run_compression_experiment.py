@@ -46,6 +46,7 @@ sys.path.insert(0, str(XPARAM_ROOT))
 from modules.compress_modules import ResnetCompressor  # noqa: E402
 from modules.denoising_diffusion import GaussianDiffusion  # noqa: E402
 from modules.unet import Unet  # noqa: E402
+from poster_panels import save_poster_panel  # noqa: E402
 
 
 UNCOMPRESSED_BPP = 24.0
@@ -324,6 +325,7 @@ def compute_reconstruction_metrics(original: torch.Tensor, reconstructed: torch.
         "error_p99": sampled_quantile(abs_diff, 0.99),
         "max_abs_error": float(abs_diff.max().item()),
         "bias_mean": float(diff.mean().item()),
+        "error_std": float(abs_diff.std(unbiased=False).item()),
     }
 
 
@@ -338,6 +340,7 @@ def round_metrics(metrics: dict[str, float]) -> dict[str, float]:
         "error_p99": round(metrics["error_p99"], 8),
         "max_abs_error": round(metrics["max_abs_error"], 8),
         "bias_mean": round(metrics["bias_mean"], 8),
+        "error_std": round(metrics["error_std"], 8),
     }
 
 
@@ -403,21 +406,32 @@ def save_visual_artifacts(
     recon_filename: str,
     preview_stem: str,
     comparison_max_edge: int,
+    quality_metrics: dict[str, float],
 ) -> dict[str, object]:
     recon_path = visuals_dir / recon_filename
     torchvision.utils.save_image(reconstructed.detach().clamp(0, 1).cpu(), str(recon_path))
 
     heatmap = error_heatmap(original, reconstructed)
     original_preview = resize_preview(original.detach().clamp(0, 1).cpu().float(), comparison_max_edge)
+    reconstructed_preview = resize_preview(reconstructed.detach().clamp(0, 1).cpu().float(), comparison_max_edge)
     heatmap_preview = resize_preview(heatmap, comparison_max_edge)
     panel = comparison_panel(original, reconstructed, heatmap, comparison_max_edge)
 
     original_path = visuals_dir / f"{preview_stem}_original_preview.png"
     heatmap_path = visuals_dir / f"{preview_stem}_error_heatmap.png"
     comparison_path = visuals_dir / f"{preview_stem}_comparison.png"
+    poster_panel_path = visuals_dir / f"{preview_stem}_poster_panel.png"
     torchvision.utils.save_image(original_preview, str(original_path))
     torchvision.utils.save_image(heatmap_preview, str(heatmap_path))
     torchvision.utils.save_image(panel, str(comparison_path))
+    save_poster_panel(
+        original_preview,
+        reconstructed_preview,
+        poster_panel_path,
+        metrics=quality_metrics,
+        max_edge=comparison_max_edge,
+        title=preview_stem,
+    )
 
     return {
         "recon_path": str(recon_path),
@@ -425,6 +439,8 @@ def save_visual_artifacts(
         "original_preview_path": str(original_path),
         "error_heatmap_path": str(heatmap_path),
         "comparison_path": str(comparison_path),
+        "poster_panel_path": str(poster_panel_path),
+        "poster_panel_bytes": os.path.getsize(poster_panel_path),
         "comparison_max_edge": comparison_max_edge,
     }
 
@@ -508,6 +524,8 @@ def run_full_image(
                 "original_preview_path": "",
                 "error_heatmap_path": "",
                 "comparison_path": "",
+                "poster_panel_path": "",
+                "poster_panel_bytes": "",
                 "comparison_max_edge": "",
             }
             if should_save_image(global_index, config):
@@ -518,6 +536,7 @@ def run_full_image(
                     f"{path.stem}_recon.png",
                     path.stem,
                     config.comparison_max_edge,
+                    quality_metrics,
                 )
 
             rows.append(
@@ -676,6 +695,8 @@ def run_tiled(
             "original_preview_path": "",
             "error_heatmap_path": "",
             "comparison_path": "",
+            "poster_panel_path": "",
+            "poster_panel_bytes": "",
             "comparison_max_edge": "",
         }
         if should_save_image(image_index, config):
@@ -686,6 +707,7 @@ def run_tiled(
                 f"{path.stem}_tile{config.tile_size}_stitched.png",
                 f"{path.stem}_tile{config.tile_size}",
                 config.comparison_max_edge,
+                quality_metrics,
             )
 
         rows.append(
@@ -828,6 +850,7 @@ def summarize_rows(
         "avg_error_p99": avg("error_p99"),
         "avg_max_abs_error": avg("max_abs_error"),
         "avg_bias_mean": avg("bias_mean"),
+        "avg_error_std": avg("error_std"),
         "avg_seam_error_mean": avg("seam_error_mean"),
         "max_seam_error_max": max_value("seam_error_max"),
         "total_estimated_compressed_bytes": int(total_estimated_bytes) if total_estimated_bytes else "",
@@ -869,6 +892,7 @@ def write_report(path: pathlib.Path, summary: dict[str, object], config: Experim
         "avg_error_p99",
         "avg_max_abs_error",
         "avg_bias_mean",
+        "avg_error_std",
         "avg_seam_error_mean",
         "max_seam_error_max",
     ]:

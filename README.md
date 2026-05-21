@@ -6,14 +6,14 @@ Based on: [Lossy Image Compression with Conditional Diffusion Models](https://ar
 
 ## SC26 Experiment Snapshot
 
-Updated: 2026-05-14
+Updated: 2026-05-21
 
 This repository is now organized around the SC26 CDC experiment design:
 
 | Owner | Pipeline | Main question | Current status |
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and GH200 100-image results are documented below. |
-| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-05-12 tiling pilot shows that `512 x 512` tiles cut memory and runtime, and the next run adds `256 x 256` plus heatmap-based quality checks. |
+| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-05-15 selected run makes `256 x 256` the speed and memory candidate. The next poster task adds original/reconstruction/hot-difference panels before 2026-05-24. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
 
@@ -89,6 +89,7 @@ srun --account=bfod-delta-gpu --partition=gpuH200x8-interactive \
 | Phase 5a | 2026-05-12 | Complete Yifan's DeltaAI tiling smoke test and `N_IMAGES=8` pilot for full-resolution images. | `results/2026-05-12-yifan-tiling-pilot/`, `results/2026-05-12-yifan-tiling-smoke/`, `docs/progress_2026-05-12_yifan_tiling.md` |
 | Phase 5b | 2026-05-14 | Prepare the follow-up `256 x 256` tiling run, add pixel-error metrics, and save original/reconstruction/error-heatmap panels. | `experiments/compression/run_compression_experiment.py`, `experiments/compression/slurm/03_tiling_sweep.sbatch`, `docs/progress_2026-05-14_yifan_tiling_next_steps.md` |
 | Phase 5c | 2026-05-15 to 2026-05-20 | Prepare Jacob's compression-side baseline, resolution, checkpoint, batch, scaling, and storage experiments for DeltaAI. | `experiments/compression/slurm/run_jacob_compression_suite.sh`, `docs/progress_2026-05-15_jacob_compression_prep.md` |
+| Phase 5d | 2026-05-21 to 2026-05-24 | Add poster-ready visual QA panels and finish selected `256 x 256` vs `512 x 512` validation. | `experiments/compression/make_poster_panels.py`, `experiments/compression/poster_panels.py`, `docs/progress_2026-05-21_yifan_poster_experiments.md` |
 
 ## Current Reconstruction Results for Yifan
 
@@ -167,6 +168,7 @@ Important files:
 | `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
 | `docs/progress_2026-05-14_yifan_tiling_next_steps.md` | Dated checklist for the `256 x 256` follow-up run, metrics, heatmap QA, and result-copy plan |
 | `docs/progress_2026-05-15_jacob_compression_prep.md` | DeltaAI runbook for Jacob's compression-side experiments due before 2026-05-20 |
+| `docs/progress_2026-05-21_yifan_poster_experiments.md` | Sunday 2026-05-24 checklist for poster panels, selected validation, and lightweight GitHub packaging |
 
 ## Slides Index
 
