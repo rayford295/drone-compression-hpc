@@ -25,8 +25,9 @@ source "${SCRIPT_DIR}/common_deltaai.sh"
 RUN_ROOT="${OUT_BASE}/01_baseline_resolution_batch"
 mkdir -p "${RUN_ROOT}"
 
-echo ">>> Baseline: native/full-resolution batch-size pilot"
-for BATCH_SIZE in 1 2 4; do
+echo ">>> Baseline: native/full-resolution run"
+echo ">>> Native batch sizes: ${NATIVE_BATCH_SIZES}"
+for BATCH_SIZE in ${NATIVE_BATCH_SIZES}; do
   run_sc26_compression \
     --ckpt "${CKPT_BASELINE}" \
     --img_dir "${IMG_DIR}" \
@@ -44,6 +45,28 @@ for BATCH_SIZE in 1 2 4; do
     --save_visual_limit "${SAVE_VISUAL_LIMIT}" \
     --storage_label "shared" \
     --notes "Baseline pretrained checkpoint with full native image resolution."
+done
+
+echo ">>> Batch-size sweep at controlled resolution"
+echo ">>> Batch test sizes: ${BATCH_TEST_SIZES}; max edge: ${BATCH_TEST_MAX_EDGE}"
+for BATCH_SIZE in ${BATCH_TEST_SIZES}; do
+  run_sc26_compression \
+    --ckpt "${CKPT_BASELINE}" \
+    --img_dir "${IMG_DIR}" \
+    --out_dir "${RUN_ROOT}/batch_test_${BATCH_TEST_RESOLUTION_LABEL}_batch${BATCH_SIZE}" \
+    --lpips_weight "${LPIPS_WEIGHT_BASELINE}" \
+    --experiment_name "batch_test_${BATCH_TEST_RESOLUTION_LABEL}_batch${BATCH_SIZE}" \
+    --compression_setting "baseline_b02048" \
+    --resolution_label "${BATCH_TEST_RESOLUTION_LABEL}" \
+    --max_edge "${BATCH_TEST_MAX_EDGE}" \
+    --batch_size "${BATCH_SIZE}" \
+    --n_images "${N_IMAGES}" \
+    --start_index "${START_INDEX}" \
+    --n_denoise_step "${N_DENOISE_STEP}" \
+    --gamma "${GAMMA}" \
+    --save_visual_limit "${SAVE_VISUAL_LIMIT}" \
+    --storage_label "shared" \
+    --notes "Batch-size sweep at controlled resolution to avoid native full-resolution OOM."
 done
 
 echo ">>> Resolution sweep: 4K, 2K, 1K at batch size 1"

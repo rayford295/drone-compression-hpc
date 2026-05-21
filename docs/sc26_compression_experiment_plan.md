@@ -51,7 +51,8 @@ RUN_STAMP=20260504_meeting_prep N_IMAGES=8 experiments/compression/slurm/run_all
 
 - native full-resolution images
 - pretrained x-param checkpoint `b0.2048`
-- batch sizes: 1, 2, 4
+- native batch size: 1 by default, because native batch 2 can exceed GH200 memory on `5440 x 3648` images
+- controlled-resolution batch sizes: 1, 2, 4 at a `2K` max edge by default
 - metrics: runtime, peak GPU memory, BPP, compression ratio, PSNR, SSIM, MSE, RMSE, MAE, high-percentile absolute error, mean bias, and error standard deviation
 
 ### Resolution Sweep

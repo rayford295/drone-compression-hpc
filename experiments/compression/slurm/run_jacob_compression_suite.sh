@@ -7,14 +7,21 @@ RUN_STAMP="${RUN_STAMP:-$(date +%Y%m%d_%H%M%S_jacob_compression)}"
 N_IMAGES="${N_IMAGES:-8}"
 SHARD_IMAGES="${SHARD_IMAGES:-8}"
 SAVE_VISUAL_LIMIT="${SAVE_VISUAL_LIMIT:-2}"
+NATIVE_BATCH_SIZES="${NATIVE_BATCH_SIZES:-1}"
+BATCH_TEST_SIZES="${BATCH_TEST_SIZES:-1 2 4}"
+BATCH_TEST_RESOLUTION_LABEL="${BATCH_TEST_RESOLUTION_LABEL:-2k_batch_test}"
+BATCH_TEST_MAX_EDGE="${BATCH_TEST_MAX_EDGE:-2048}"
 
 export REPO_DIR RUN_STAMP N_IMAGES SHARD_IMAGES SAVE_VISUAL_LIMIT
+export NATIVE_BATCH_SIZES BATCH_TEST_SIZES BATCH_TEST_RESOLUTION_LABEL BATCH_TEST_MAX_EDGE
 
 echo "Submitting Jacob compression-side SC26 suite."
 echo "Repo        : ${REPO_DIR}"
 echo "Run stamp   : ${RUN_STAMP}"
 echo "N_IMAGES    : ${N_IMAGES}"
 echo "SHARD_IMAGES: ${SHARD_IMAGES}"
+echo "Native batch sizes: ${NATIVE_BATCH_SIZES}"
+echo "Batch test sizes  : ${BATCH_TEST_SIZES} at ${BATCH_TEST_RESOLUTION_LABEL}/${BATCH_TEST_MAX_EDGE}px"
 echo ""
 echo "This suite submits:"
 echo "  01 baseline + resolution + batch-size sweep"
@@ -24,7 +31,7 @@ echo "  05 shared-vs-local storage comparison"
 echo "  06 final summary"
 echo ""
 
-jid1=$(sbatch --parsable --export=ALL,REPO_DIR="${REPO_DIR}",RUN_STAMP="${RUN_STAMP}",N_IMAGES="${N_IMAGES}",SAVE_VISUAL_LIMIT="${SAVE_VISUAL_LIMIT}" "${SCRIPT_DIR}/01_baseline_resolution_batch.sbatch")
+jid1=$(sbatch --parsable --export=ALL,REPO_DIR="${REPO_DIR}",RUN_STAMP="${RUN_STAMP}",N_IMAGES="${N_IMAGES}",SAVE_VISUAL_LIMIT="${SAVE_VISUAL_LIMIT}",NATIVE_BATCH_SIZES="${NATIVE_BATCH_SIZES}",BATCH_TEST_SIZES="${BATCH_TEST_SIZES}",BATCH_TEST_RESOLUTION_LABEL="${BATCH_TEST_RESOLUTION_LABEL}",BATCH_TEST_MAX_EDGE="${BATCH_TEST_MAX_EDGE}" "${SCRIPT_DIR}/01_baseline_resolution_batch.sbatch")
 echo "Submitted baseline/resolution/batch job: ${jid1}"
 
 jid2=$(sbatch --parsable --dependency=afterok:${jid1} --export=ALL,REPO_DIR="${REPO_DIR}",RUN_STAMP="${RUN_STAMP}",N_IMAGES="${N_IMAGES}",SAVE_VISUAL_LIMIT="${SAVE_VISUAL_LIMIT}" "${SCRIPT_DIR}/02_checkpoint_level_sweep.sbatch")

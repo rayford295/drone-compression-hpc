@@ -7,7 +7,8 @@ This folder contains the runnable experiment scaffold for the next compression m
 | Task | Script |
 | --- | --- |
 | Baseline full-resolution run | `slurm/01_baseline_resolution_batch.sbatch` |
-| Batch-size test, 1, 2, 4 | `slurm/01_baseline_resolution_batch.sbatch` |
+| Native batch-size test, default 1 only | `slurm/01_baseline_resolution_batch.sbatch` |
+| Controlled-resolution batch-size test, 1, 2, 4 | `slurm/01_baseline_resolution_batch.sbatch` |
 | Resolution sweep, 4K, 2K, 1K | `slurm/01_baseline_resolution_batch.sbatch` |
 | Compression-level check | `inspect_compression_controls.py` |
 | Checkpoint-based compression sweep | `slurm/02_checkpoint_level_sweep.sbatch` |
@@ -153,6 +154,12 @@ Run the baseline, batch, and resolution sweep:
 
 ```bash
 N_IMAGES=8 sbatch experiments/compression/slurm/01_baseline_resolution_batch.sbatch
+```
+
+The native full-resolution batch test defaults to `batch_size=1` because `batch_size=2` can exceed GH200 memory for `5440 x 3648` images. The 1/2/4 batch-size sweep runs at a controlled `2K` max edge by default. Override only when you want to test the native OOM boundary:
+
+```bash
+NATIVE_BATCH_SIZES="1 2 4" N_IMAGES=4 sbatch experiments/compression/slurm/01_baseline_resolution_batch.sbatch
 ```
 
 Run the checkpoint compression-level sweep:

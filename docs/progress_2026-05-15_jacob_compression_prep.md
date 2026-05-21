@@ -18,7 +18,7 @@ The repo already has runnable DeltaAI scripts for the requested tasks:
 | --- | --- | --- |
 | Baseline full-resolution run | `experiments/compression/slurm/01_baseline_resolution_batch.sbatch` | `01_baseline_resolution_batch/` |
 | Resolution sweep, 4K to 2K to 1K | `experiments/compression/slurm/01_baseline_resolution_batch.sbatch` | `01_baseline_resolution_batch/` |
-| Batch size 1, 2, 4 | `experiments/compression/slurm/01_baseline_resolution_batch.sbatch` | `01_baseline_resolution_batch/` |
+| Native batch size 1 plus controlled-resolution batch size 1, 2, 4 | `experiments/compression/slurm/01_baseline_resolution_batch.sbatch` | `01_baseline_resolution_batch/` |
 | Compression level low/medium/high | `experiments/compression/slurm/02_checkpoint_level_sweep.sbatch` | `02_checkpoint_level_sweep/` |
 | Multiple jobs in parallel | `experiments/compression/slurm/04_hpc_scaling_array.sbatch` | `04_hpc_scaling_array/` |
 | Shared vs local storage | `experiments/compression/slurm/05_storage_compare.sbatch` | `05_storage_compare/` |
@@ -31,6 +31,8 @@ experiments/compression/slurm/run_jacob_compression_suite.sh
 ```
 
 This launcher intentionally skips the tiling sweep because Jacob's request is about compression-side baseline, parameter, scaling, and storage experiments.
+
+Native full-resolution batch size 2 can exceed DeltaAI GH200 memory on `5440 x 3648` images. The default launcher therefore runs native full-resolution at batch size 1 and runs the 1/2/4 batch-size sweep at a controlled `2K` max edge. To force native batch 2 or 4 for a special test, set `NATIVE_BATCH_SIZES="1 2 4"` explicitly.
 
 ## Important Compression-Level Note
 
