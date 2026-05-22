@@ -142,7 +142,8 @@ results/
 ├── 2026-04-28-h200-reconstruction/  # Delta H200 quick comparison sweep
 ├── 2026-05-12-yifan-tiling-smoke/   # DeltaAI GH200 tiling smoke test
 ├── 2026-05-12-yifan-tiling-pilot/   # DeltaAI GH200 tiling pilot
-└── 2026-05-15-yifan-selected-256-512-n50/  # DeltaAI GH200 selected 256 vs 512 comparison
+├── 2026-05-15-yifan-selected-256-512-n50/  # DeltaAI GH200 selected 256 vs 512 comparison
+└── 2026-05-22-jacob-compression-n20/       # DeltaAI GH200 Jacob compression-side validation
 ```
 
 Important files:
@@ -165,6 +166,7 @@ Important files:
 | `results/2026-05-12-yifan-tiling-pilot/visual_examples_small/` | Lightweight overview and seam-region examples for visual artifact checking |
 | `results/2026-05-12-yifan-tiling-smoke/tables/combined_summary.csv` | Yifan tiling smoke-test summary |
 | `results/2026-05-15-yifan-selected-256-512-n50/tables/combined_summary.csv` | Yifan `N_IMAGES=50` selected `256 x 256` vs `512 x 512` tiling summary |
+| `results/2026-05-22-jacob-compression-n20/tables/combined_summary.csv` | Jacob compression-side `N_IMAGES=20` baseline, resolution, batch, checkpoint, scaling, and storage summary |
 | `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
 | `docs/progress_2026-05-14_yifan_tiling_next_steps.md` | Dated checklist for the `256 x 256` follow-up run, metrics, heatmap QA, and result-copy plan |
 | `docs/progress_2026-05-15_jacob_compression_prep.md` | DeltaAI runbook for Jacob's compression-side experiments due before 2026-05-20 |
