@@ -1,0 +1,18 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{url}
+
+\begin{document}
+\title{Artifact Description Appendix: CDC Drone Imagery Compression on DeltaAI}
+\author{\IEEEauthorblockN{Jooho Kim, Anish Shakya, Yifan Yang, and Jacob Kelly}}
+\maketitle
+
+\section{Artifact Scope}
+The public artifact is the GitHub repository \url{https://github.com/rayford295/sc26-cdc-deltaai}. It contains the experiment runners, SLURM scripts, summary tables, plotting code, and lightweight visual examples used for the poster draft. Raw full-resolution drone imagery, trained checkpoints, full reconstruction outputs, and DeltaAI logs remain on the project HPC filesystem and are not included in the public repository.
+
+\section{Main Public Files}
+The main experiment code lives under \texttt{experiments/compression/}. The summary results used in the poster live under \texttt{results/2026-05-15-yifan-selected-256-512-n50/} and \texttt{results/2026-05-22-jacob-compression-n20/}. The current poster and IEEE-format summary live under \texttt{paper/submission/}.
+
+\section{Reproducibility Notes}
+The workflow depends on NCSA DeltaAI, the project allocation, pretrained CDC checkpoints, and the drone imagery dataset. The public repository documents the run commands, output layout, and metrics. A reviewer can inspect the code and lightweight results locally, but full numerical reproduction requires access to the same DeltaAI environment and non-public input imagery.
+
+\end{document}
