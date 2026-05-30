@@ -2,7 +2,7 @@
 
 all: sc26_summary.pdf poster_draft.pdf artifact_description_appendix.pdf
 
-sc26_summary.pdf: sc26_summary.tex references.bib
+sc26_summary.pdf: sc26_summary.tex
 	tectonic sc26_summary.tex
 
 poster_draft.pdf: poster_draft.tex

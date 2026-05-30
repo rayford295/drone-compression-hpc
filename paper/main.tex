@@ -2,6 +2,7 @@
 
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
@@ -11,7 +12,7 @@
 
 \begin{document}
 
-\title{Cost-Aware Conditional Diffusion Compression of 4K-5K Drone Imagery for Scalable High-Performance Computing Workflows}
+\title{Cost-Aware Conditional Diffusion Compression of 4K-5K Drone Imagery for Scalable Disaster-Response HPC Workflows}
 
 \author{
 \IEEEauthorblockN{Jooho Kim\IEEEauthorrefmark{1}, Anish Shakya\IEEEauthorrefmark{2}, Yifan Yang\IEEEauthorrefmark{2}, and Jacob Kelly\IEEEauthorrefmark{2}}
@@ -23,96 +24,134 @@
 \maketitle
 
 \begin{abstract}
-High-resolution drone imagery supports detailed disaster assessment, object mapping, and recovery planning, but 4K-5K imagery creates a difficult data-management problem for high-performance computing (HPC) workflows. Full-resolution image archives increase storage cost, data movement, GPU memory pressure, and turnaround time for downstream analysis. This paper studies conditional diffusion compression (CDC) as a cost-aware strategy for managing large drone-image collections on GPU HPC systems. We adapt a CDC reconstruction and compression workflow to NCSA DeltaAI, run controlled experiments on full-resolution drone images cropped to $5440 \times 3648$ pixels, and measure runtime, GPU memory, compression ratio, PSNR, SSIM, pixel-error statistics, and tiling artifacts. The experiments show that native full-image processing is feasible but memory-heavy, using about 52 GB of GPU memory and 144 seconds per image in the baseline configuration. A selected $256 \times 256$ tiling configuration reduces runtime by 44.7\% and peak GPU memory by about 31.3$\times$ relative to no tiling while keeping PSNR and SSIM close to the full-image reference. Resolution reduction gives large speedups but noticeably degrades quality, and larger batch sizes do not improve throughput in the controlled 2K setting. The results identify tiling and checkpoint selection as the most practical near-term controls for scalable CDC-based drone imagery workflows.
+High-resolution drone imagery is increasingly important for disaster response because it captures local scene evidence that complements satellite and street-view observations. The same resolution that makes these images useful also makes them expensive to store, move, and reconstruct in high-performance computing (HPC) workflows. This paper studies conditional diffusion compression (CDC) as a cost-aware compression and reconstruction strategy for 4K-5K drone imagery on GPU HPC systems. We do not propose a new neural compression architecture. Instead, we ask which operational controls make an existing CDC workflow practical for disaster-imagery workloads. We adapt an x-parameterized CDC implementation to NCSA DeltaAI, evaluate full-resolution drone images cropped to $5440 \times 3648$ pixels, and measure runtime, peak GPU memory, estimated bits per pixel (BPP), compression ratio, PSNR, SSIM, pixel-error statistics, and tile-boundary artifacts. Native full-image processing is feasible but expensive: at 65 denoising steps, the baseline uses about 52 GB of GPU memory and takes about 144 seconds per image. A selected $256 \times 256$ tiling configuration reduces runtime from 144.35 to 79.84 seconds per image and peak memory from 52.01 to 1.66 GB on 50 full-resolution images, while keeping scalar quality close to the no-tiling and $512 \times 512$ tiling references. Resolution reduction provides larger raw speedups, but it removes visual detail and degrades SSIM substantially at 2K and 1K settings. Checkpoint choice changes the storage-quality trade-off, while larger controlled-resolution batches and local storage staging do not improve throughput in the measured runs. The results show that CDC deployment for disaster imagery must be reported as a joint systems and image-quality problem: bitrate alone is not enough.
 \end{abstract}
 
 \begin{IEEEkeywords}
-conditional diffusion compression, drone imagery, high-performance computing, lossy compression, GPU memory, tiling
+conditional diffusion compression, drone imagery, disaster response, high-performance computing, neural compression, tiling, GPU memory
 \end{IEEEkeywords}
 
 \section{Introduction}
 
-Drone imagery is increasingly used after floods, storms, and other disasters because it provides local visual evidence at a spatial detail that satellite imagery often cannot supply. The same resolution that makes these images useful also makes them costly to store and process. A single full-resolution frame in the current workflow has $5440 \times 3648$ pixels; as uncompressed RGB, that image contains about 59.5 MB of pixel data. A field campaign with thousands of such frames can quickly become a storage, transfer, and GPU scheduling problem before the research team reaches the downstream mapping or assessment task.
+Drone imagery has become a practical source of post-disaster visual evidence. It can capture road blockages, roof damage, flood debris, and parcel-scale changes at a level of detail that coarser remote sensing products often cannot provide. This role is adjacent to recent disaster-imagery work that uses generative cross-view synthesis to reason from satellite to street-level views \cite{yang2026satellite} and bi-temporal street-view imagery to support hyperlocal damage assessment \cite{yang2025hyperlocal}. Together, these lines of work point to a broader need: disaster-response systems need visual data that are detailed enough for inspection, but inexpensive enough to store, move, and process repeatedly.
 
-Lossy neural compression offers a way to reduce that burden, but disaster-imagery workflows need more than a low bitrate. They need predictable reconstruction time, bounded GPU memory, reproducible quality checks, and output artifacts that can be inspected by humans. Conditional diffusion compression is attractive because it can reconstruct visually plausible image content from a compact latent representation \cite{yang2022lossy}. At the same time, diffusion decoding is iterative. If the denoising process is too slow or too memory-intensive, the compression scheme becomes difficult to use in HPC production workflows.
+High-resolution drone images create a systems problem before they become a modeling problem. The images in our workflow are cropped to $5440 \times 3648$ pixels. A single 8-bit RGB frame at this resolution contains about 59.5 MB of uncompressed pixel data. A field collection with thousands of frames can therefore become a multi-hundred-gigabyte or terabyte-scale archive. In an HPC setting, the cost appears in several places: long-term storage, transfer from project filesystems to compute nodes, GPU memory pressure, queue time, and repeated decoding when analysts rerun quality checks or downstream models.
 
-This paper studies the system-level operating conditions for CDC-based drone-image compression on GPU HPC hardware. The goal is not to introduce a new compression architecture. Instead, we ask a practical question: under what settings can an existing CDC workflow become fast, memory-efficient, and inspectable enough for large disaster-imagery workloads?
+Learned image compression offers one path through this bottleneck. Autoencoder-based neural codecs and hyperprior models have shown strong rate-distortion performance \cite{balle2018hyperprior}. Diffusion models provide a different reconstruction mechanism: they can generate visually plausible details through iterative denoising \cite{ho2020ddpm}, and latent diffusion models reduce the cost of high-resolution synthesis by operating in a compact latent space \cite{rombach2022ldm}. Conditional diffusion compression (CDC) uses a diffusion decoder as part of a lossy compression system \cite{yang2022lossy}. That design is attractive for visual quality, but it introduces a practical deployment issue: diffusion decoding is iterative, and full-resolution reconstruction can be slow and memory-heavy.
 
-The paper makes three contributions. First, it adapts a CDC compression and reconstruction workflow to NCSA DeltaAI and defines a repeatable experiment suite for native images, downsampled images, batch-size sweeps, checkpoint sweeps, storage placement, and tiled reconstruction. Second, it reports measured trade-offs for full-resolution drone imagery on GH200-class hardware, including runtime, memory, compression ratio, PSNR, SSIM, and pixel-error statistics. Third, it identifies a selected $256 \times 256$ tiling configuration that sharply reduces memory and runtime while preserving comparable image-quality metrics and avoiding obvious tile-boundary artifacts in the inspected visual examples.
+This paper studies CDC as an HPC workflow rather than as a new compression model. We ask: \textit{Which runtime settings make CDC usable for large drone-imagery workloads while preserving enough visual detail for disaster-response inspection?} We focus on operational choices that a research team can control without retraining the model: denoising steps, precision, resolution, tile size, tile batch size, checkpoint choice, job parallelism, and storage placement.
 
-% TODO: Add a full related-work section after the core experimental narrative stabilizes.
-
-\section{Problem Setting and Design Goals}
-
-\subsection{Workflow Setting}
-
-The target workflow starts from high-resolution drone images, compresses them with a pretrained CDC model, reconstructs them for analysis, and stores lightweight quality evidence for review. The repository separates two operational questions. The compression-side question asks how quickly the data can be reduced and which bitrate-quality settings are practical. The reconstruction-side question asks how quickly the compressed data can be used again, especially when full-resolution decoding stresses GPU memory.
-
-The workflow uses the x-parameterized CDC path from the original model implementation \cite{yang2022lossy}. In this path, the compression setting is controlled by the checkpoint rather than by a runtime quality argument. The experiment suite therefore treats checkpoint selection as the main compression-level control and uses measured bits per pixel (BPP) and compression ratio to label low-, balanced-, and high-compression operating points.
-
-\subsection{Design Goals}
-
-The workflow is designed around four practical goals.
-
+Our contributions are:
 \begin{itemize}
-\item \textit{Cost reduction}: reduce estimated storage relative to uncompressed RGB imagery without destroying the information needed for visual inspection and downstream analysis.
-\item \textit{Runtime control}: reduce per-image reconstruction time enough that hundreds or thousands of images can be processed within normal HPC allocation and queue constraints.
-\item \textit{Memory control}: avoid configurations that require full-GPU memory for each image when a tiled alternative can preserve quality with lower peak allocation.
-\item \textit{Inspectability}: save tables, heatmaps, comparison panels, and poster-ready visual panels so that scalar metrics do not hide reconstruction artifacts.
+\item We adapt a CDC compression and reconstruction workflow to NCSA DeltaAI and define a reproducible experiment suite for high-resolution drone imagery.
+\item We report the cost-quality behavior of native full-resolution processing, denoising-step reduction, resolution reduction, tiling, batch-size changes, checkpoint selection, storage placement, and parallel shards.
+\item We identify $256 \times 256$ tiling as the best current runtime-memory operating point in the selected validation run, reducing peak GPU memory by 31.3$\times$ and runtime by 44.7\% relative to no tiling.
+\item We show why visual QA is necessary for tiled CDC: scalar metrics are useful, but heatmaps, comparison panels, and seam checks are needed to detect spatial artifacts that would matter in disaster imagery.
 \end{itemize}
 
-\section{Workflow and Implementation}
+\section{Related Work}
 
-\subsection{Compression and Reconstruction}
+\subsection{Disaster Imagery and Visual Evidence}
 
-The CDC workflow maps each image into a compressed representation and reconstructs it through a conditional diffusion decoder. We evaluate the x-parameterized model path because it supports high-quality reconstruction with a reduced number of denoising steps \cite{yang2022lossy}. The runner records wall time, inference time, peak GPU memory, estimated BPP, compression ratio, PSNR, SSIM, mean absolute error (MAE), high-percentile pixel error, signed bias, and error standard deviation.
+Disaster-response imagery spans satellite, aerial, drone, street-view, and field observations. Each modality carries a different trade-off between coverage, resolution, timeliness, and interpretability. Satellite imagery provides broad coverage, but it may miss street-level details. Street-view imagery gives a ground perspective, but it may not be available immediately after an event. Yang et al. \cite{yang2026satellite} study post-disaster satellite-to-street view synthesis and emphasize the realism-fidelity tension in generative disaster imagery. Yang et al. \cite{yang2025hyperlocal} use pre- and post-disaster street-view imagery with pretrained vision models for hyperlocal damage assessment. Our work is complementary: it does not synthesize new views or classify damage directly. It asks how to compress and reconstruct high-resolution drone imagery so that such visual evidence can move through HPC workflows at lower cost.
 
-Compression ratio is computed against uncompressed RGB storage as
+\subsection{Learned Compression and Diffusion Reconstruction}
+
+Learned image compression commonly optimizes a rate-distortion objective. Hyperprior models improve learned codecs by modeling latent dependencies and side information \cite{balle2018hyperprior}. CDC differs from deterministic decoder approaches because reconstruction uses a conditional diffusion model \cite{yang2022lossy}. This creates a useful quality path but also a runtime path that depends on denoising steps. Ho et al. \cite{ho2020ddpm} established diffusion probabilistic models as iterative denoising generators, and Rombach et al. \cite{rombach2022ldm} showed that latent-space diffusion can improve the efficiency of high-resolution synthesis. For our setting, the relevant question is not whether diffusion can reconstruct visually plausible images. It is whether the iterative decoder can be scheduled, tiled, and measured well enough for operational use on large drone-image collections.
+
+\subsection{HPC Workflow Framing}
+
+HPC image workflows often fail at practical boundaries: a model may fit on a small test image but become slow or memory-limited at native resolution. DeltaAI is built around NVIDIA GH200 Grace Hopper systems \cite{ncsa2026deltaai}, which makes it a relevant platform for evaluating GPU memory pressure and full-resolution reconstruction. We treat platform cost as part of the method. A compression setting is not useful merely because it reports a favorable BPP; it must also fit GPU memory, reconstruct fast enough, preserve relevant visual structure, and leave auditable evidence for the user.
+
+\section{Problem Definition}
+
+\subsection{Workflow Objective}
+
+Let $x \in [0,1]^{H \times W \times 3}$ denote a full-resolution drone image. A CDC workflow maps $x$ to a compressed representation $z$ and reconstructs an image $\hat{x}$ through a conditional diffusion decoder. In this paper, the target image size is $H \times W = 3648 \times 5440$ after cropping. The workflow must satisfy three practical requirements:
+\begin{enumerate}
+\item \textit{Storage reduction}: the compressed representation should be much smaller than uncompressed RGB.
+\item \textit{Feasible reconstruction}: decoding should fit GPU memory and finish within a usable time budget.
+\item \textit{Inspectability}: reconstruction artifacts should be visible to reviewers through tables, heatmaps, and side-by-side comparisons.
+\end{enumerate}
+
+\subsection{Metrics}
+
+We report compression ratio against uncompressed 8-bit RGB storage:
 \begin{equation}
 R = \frac{24}{\mathrm{BPP}},
+\label{eq:ratio}
 \end{equation}
-where 24 is the number of bits per pixel in an 8-bit RGB image. A measured BPP of 0.35 therefore corresponds to a ratio of about $68.6\times$.
+where BPP is the estimated model bitrate. A BPP of 0.35 corresponds to a compression ratio of about $68.6\times$.
+
+For a candidate configuration $\theta$, we also report runtime reduction and memory reduction relative to a baseline:
+\begin{equation}
+S_T(\theta) = 1 - \frac{T_{\theta}}{T_{\mathrm{base}}},
+\label{eq:speedup}
+\end{equation}
+\begin{equation}
+G_M(\theta) = \frac{M_{\mathrm{base}}}{M_{\theta}},
+\label{eq:memorygain}
+\end{equation}
+where $T$ is wall time per image and $M$ is peak GPU memory. These quantities make the systems trade-off explicit. They do not replace image-quality metrics.
+
+Reconstruction quality is measured with PSNR, SSIM \cite{wang2004ssim}, mean absolute error (MAE), and high-percentile absolute error. For tiled runs, we additionally record a seam metric and inspect heatmaps. This combination matters because a configuration can preserve average PSNR and SSIM while producing regular boundary artifacts that are visually important.
+
+\section{Implementation}
+
+\subsection{CDC Path}
+
+The implementation uses the x-parameterized CDC path adapted in this repository from the original CDC implementation \cite{yang2022lossy}. The x-parameterized path does not expose a direct runtime parameter named \texttt{compression\_level}, \texttt{quality}, \texttt{bitrate}, or \texttt{quantization}. Compression level is therefore controlled through checkpoint choice. The experiment suite reports checkpoint name together with measured BPP, compression ratio, PSNR, and SSIM so the compression setting is interpretable.
+
+\subsection{Experiment Runner}
+
+Each run writes a per-image \texttt{results.csv}, an aggregate \texttt{summary.csv}, a manifest, a short report, and optional visual files. The runner records wall time, GPU-timed inference time, peak GPU memory, BPP, compression ratio, PSNR, SSIM, MSE, RMSE, MAE, 95th and 99th percentile absolute error, maximum absolute error, bias, error standard deviation, and tiled-only seam error. The lightweight GitHub package stores tables and downsampled visuals. Full-resolution reconstructions, checkpoints, raw images, and full logs remain on DeltaAI.
 
 \subsection{Tiling}
 
-Native full-resolution images can exceed comfortable memory limits during diffusion decoding. Tiling addresses this problem by splitting an image into fixed-size tiles, compressing and reconstructing each tile, and stitching the tiles back into a full image. We evaluate tile sizes of 256, 512, 1024, and 2048 pixels in pilot experiments and then focus on 256 and 512 pixels in the selected validation run.
-
-Tiling introduces a new failure mode: visible grid artifacts at tile boundaries. The workflow therefore records a seam-error metric and saves absolute-error heatmaps and comparison panels. These visual checks complement PSNR and SSIM, which may miss spatially regular artifacts.
-
-\subsection{Experiment Suite}
-
-The experiment suite covers six controls: native full-resolution processing, downsampled resolution, batch size, checkpoint selection, parallel shards, and storage placement. Each run writes per-image results, an aggregate summary, a machine-readable manifest, and optional visual artifacts. The final GitHub package keeps lightweight tables and downsampled visual previews while leaving raw reconstructions, logs, and full image archives on DeltaAI.
+Native full-resolution decoding is memory-heavy because the full image tensor and diffusion intermediates must be represented together. Tiling splits the image into fixed-size patches, compresses and reconstructs each patch, and stitches the outputs back to the native image size. We evaluate $512 \times 512$, $1024 \times 1024$, and $2048 \times 2048$ in the first pilot, then add $256 \times 256$ for the selected run. Tiling changes the memory footprint, but it can introduce boundary artifacts. The workflow therefore saves three families of visual evidence:
+\begin{itemize}
+\item original/reconstruction/error comparison panels,
+\item absolute-error heatmaps,
+\item visual QA panels with histograms and difference distributions.
+\end{itemize}
 
 \section{Experimental Setup}
 
 \subsection{Data}
 
-The experiments use full-resolution drone images cropped to $5440 \times 3648$ pixels. The reconstruction step sweep uses a small repeated set for profiling. The tiling pilot uses 8 images, the selected tiling validation uses 50 images, and the compression-side validation uses 20 images. These sample sizes are intentionally modest because the goal of this paper is to identify operating regimes before running a larger production-scale evaluation.
+The experiments use full-resolution drone images cropped to $5440 \times 3648$ pixels. The reconstruction step sweep uses a repeated profiling set. The tiling pilot uses 8 images. The selected tiling validation uses 50 images. The compression-side validation uses 20 images. These sample sizes are sufficient to identify runtime-memory regimes, but they are not yet a final large-scale benchmark. We therefore treat the results as an operating-point study.
 
 \subsection{Platform}
 
-The primary experiments run on NCSA DeltaAI. DeltaAI is a GPU-focused HPC system based on NVIDIA GH200 Grace Hopper superchips and a Slingshot interconnect \cite{ncsa2026deltaai}. The committed results in this draft should be read as DeltaAI GH200 results unless a table explicitly labels a Delta H200 comparison. This distinction matters because GPU memory capacity, CPU-GPU coupling, filesystem behavior, and queue policy can all change the best operating point.
+The main experiments run on NCSA DeltaAI with GH200-class hardware. The committed results should be read as DeltaAI GH200 results unless a row explicitly states otherwise. A small Delta H200 check is included only as a platform-sensitivity note. It is not treated as a full cross-system benchmark.
 
-\subsection{Metrics}
+\subsection{Experiment Matrix}
 
-We use wall time and peak GPU memory to measure workflow cost. Compression ratio, BPP, PSNR, SSIM \cite{wang2004ssim}, MAE, and high-percentile error describe storage and reconstruction quality. For tiled runs, seam-error metrics and visual heatmaps test whether reconstruction differences form regular tile-boundary patterns.
+The experiment suite covers seven questions:
+\begin{enumerate}
+\item How does denoising step count affect reconstruction time and quality?
+\item Does fp16 reduce runtime and memory, and can it be used for BPP reporting?
+\item How much do resolution reduction and native full-resolution decoding differ?
+\item Does controlled-resolution batching improve throughput?
+\item Which checkpoint provides the best compression-quality point?
+\item Does tiling reduce memory without unacceptable quality loss?
+\item Does local node storage improve runtime relative to shared storage?
+\end{enumerate}
 
-\newpage
 \section{Results}
-\suppressfloats[t]
 
 \subsection{Diffusion Steps Dominate Reconstruction Time}
 
-The reconstruction step sweep confirms that diffusion decoding is the dominant bottleneck. In the DeltaAI GH200 fp32 run, reducing the denoising process from 65 steps to 5 steps reduced inference time from 143.67 seconds per image to 11.27 seconds per image. Peak memory stayed near 52.2 GB because the full image still had to be represented in memory. The fp16 runs reduced memory to about 34.2 GB and slightly improved speed, but the current fp16 path produced invalid BPP values, so fp32 remains the reporting path for compression-ratio results.
+Table~\ref{tab:step-sweep} reports the DeltaAI GH200 fp32 step sweep. Runtime grows almost linearly with denoising steps. Reducing the denoising process from 65 steps to 5 steps lowers inference time from 143.67 to 11.27 seconds per image, a 92.2\% reduction. Peak memory stays near 52.2 GB because the same full-resolution image is decoded. This result separates two problems: denoising steps control time, while resolution and tiling control memory.
 
 \begin{table}[t]
 \caption{DeltaAI GH200 reconstruction step sweep, fp32, batch size 1.}
 \label{tab:step-sweep}
 \centering
-\begin{tabular}{c r r r r}
-\hline
+\begin{tabular}{rrrrr}
+\toprule
 Steps & Sec./image & GB & PSNR & SSIM\\
-\hline
+\midrule
 5 & 11.27 & 52.2 & 31.57 & 0.9066\\
 10 & 22.29 & 52.2 & 31.00 & 0.9019\\
 20 & 44.37 & 52.2 & 30.47 & 0.8961\\
@@ -120,108 +159,201 @@ Steps & Sec./image & GB & PSNR & SSIM\\
 50 & 110.56 & 52.2 & 30.03 & 0.8873\\
 65 & 143.67 & 52.2 & 29.92 & 0.8845\\
 100 & 220.85 & 52.2 & 29.77 & 0.8809\\
-\hline
+\bottomrule
 \end{tabular}
 \end{table}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{reconstruction_time_vs_steps.png}
-\caption{Reconstruction time increases nearly linearly with denoising steps in the full-image DeltaAI GH200 profile.}
+\caption{Measured reconstruction time versus denoising steps. The near-linear trend shows that the iterative decoder dominates runtime.}
 \label{fig:time-steps}
 \end{figure}
 
-\subsection{Tiling Reduces Memory and Runtime}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{reconstruction_quality_vs_speed.png}
+\caption{Quality-speed trade-off for the reconstruction step sweep. Lower step counts improve speed, while PSNR and SSIM change more gradually.}
+\label{fig:quality-speed}
+\end{figure}
 
-The first tiling pilot showed that a $512 \times 512$ tile reduced time from 143.55 to 86.01 seconds per image and peak GPU memory from 52.0 GB to 3.0 GB. The later selected validation compared no tiling, $256 \times 256$ tiling, and $512 \times 512$ tiling on 50 full-resolution images. Table~\ref{tab:tiling} shows the selected result.
+\subsection{Precision Helps Memory but Not Current Bitrate Reporting}
+
+The fp16 profile lowers peak GPU memory from about 52.2 GB to about 34.2 GB and slightly improves runtime, but the current fp16 output records invalid BPP values. For that reason, fp16 is useful as a speed-memory observation but not as the reporting path for compression-ratio claims in this draft. This is a practical example of why workflow metrics must include data validity checks, not only runtime.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{reconstruction_memory_vs_steps.png}
+\caption{Peak GPU memory in the reconstruction step sweep. Precision changes memory, but step count alone does not remove the full-image memory footprint.}
+\label{fig:memory-steps}
+\end{figure}
+
+\subsection{Native Reconstruction Preserves Detail but Is Expensive}
+
+The visual examples in Fig.~\ref{fig:step-comparison} show representative full-image reconstruction outputs at several step counts. The purpose of this figure is not to choose a final quality threshold, but to connect the numerical step sweep to visible behavior. Disaster-response imagery needs this connection because small details may matter to a human reviewer even when aggregate metrics look acceptable.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.95\textwidth]{reconstruction_step_comparison.jpg}
+\caption{Representative reconstruction examples from the step-sweep outputs. These are existing experiment outputs from the repository, copied into the paper folder for compilation.}
+\label{fig:step-comparison}
+\end{figure*}
+
+\subsection{Tiling Reduces Runtime and Memory}
+
+The selected tiling validation compares no tiling, $256 \times 256$ tiling, and $512 \times 512$ tiling on 50 full-resolution images. Table~\ref{tab:tiling} summarizes the result. The $256 \times 256$ setting reduces time from 144.35 to 79.84 seconds per image and peak memory from 52.01 to 1.66 GB. Using Eqs.~\eqref{eq:speedup} and \eqref{eq:memorygain}, this is a 44.7\% runtime reduction and a 31.3$\times$ peak-memory reduction relative to no tiling.
 
 \begin{table*}[t]
 \caption{Selected DeltaAI GH200 tiling validation on 50 full-resolution images, 65 denoising steps, fp32.}
 \label{tab:tiling}
 \centering
-\begin{tabular}{l r r r r r r r}
-\hline
-Setup & Sec./image & GB & Ratio & PSNR & SSIM & MAE & Error p99\\
-\hline
-No tiling & 144.35 & 52.01 & 70.11$\times$ & 28.96 & 0.8616 & 0.027016 & 0.117676\\
-$256 \times 256$ tile & 79.84 & 1.66 & 68.24$\times$ & 28.78 & 0.8552 & 0.027463 & 0.120211\\
-$512 \times 512$ tile & 87.71 & 3.02 & 66.31$\times$ & 28.86 & 0.8583 & 0.027246 & 0.118897\\
-\hline
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Setup & Sec./image & GB & Ratio & PSNR & SSIM & MAE & Error p99 & Seam\\
+\midrule
+No tiling & 144.35 & 52.01 & 70.11$\times$ & 28.96 & 0.8616 & 0.027016 & 0.117676 & n/a\\
+$256 \times 256$ tile & 79.84 & 1.66 & 68.24$\times$ & 28.78 & 0.8552 & 0.027463 & 0.120211 & 0.032556\\
+$512 \times 512$ tile & 87.71 & 3.02 & 66.31$\times$ & 28.86 & 0.8583 & 0.027246 & 0.118897 & 0.032224\\
+\bottomrule
 \end{tabular}
 \end{table*}
 
-The $256 \times 256$ setting is the best speed and memory candidate in the selected run. It reduces wall time by 44.7\% and peak GPU memory by about 31.3$\times$ relative to no tiling. Compared with $512 \times 512$ tiling, it is about 9.0\% faster and uses about 45.0\% less GPU memory. The quality trade-off is small in scalar metrics: compared with $512 \times 512$, PSNR drops by 0.086 dB, SSIM drops by 0.0031, and the 99th percentile absolute error increases by 0.001314.
+The $256 \times 256$ setting is also faster and smaller than $512 \times 512$ tiling. It is about 9.0\% faster and uses about 45.0\% less memory. The quality penalty relative to $512 \times 512$ is modest in scalar metrics: PSNR is lower by 0.086 dB, SSIM is lower by 0.0031, MAE is higher by 0.000217, and error p99 is higher by 0.001314. The seam metric is nearly unchanged. These numbers do not prove that every $256 \times 256$ reconstruction is artifact-free, but they justify treating it as the current speed-memory candidate.
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.86\textwidth]{tile256_poster_panel.jpg}
-\caption{Poster-ready visual QA panel for the selected $256 \times 256$ tiling case. The panel combines original preview, reconstruction, hot difference map, pixel-difference histogram, metric text, and difference distribution for a representative image.}
+\includegraphics[width=0.88\textwidth]{tile256_poster_panel.jpg}
+\caption{Visual QA panel for the selected $256 \times 256$ tiling case. The panel includes original preview, reconstruction, hot difference map, histogram of pixel differences, quality metrics, and difference distribution.}
 \label{fig:tile-panel}
+\end{figure*}
+
+\subsection{Visual Checks Are Needed for Tiling}
+
+Figure~\ref{fig:tiling-comparisons} compares the no-tiling, $256 \times 256$, and $512 \times 512$ visual panels for the same representative image. These figures are downsampled from experiment outputs, but they serve an important role: they help identify whether tiling creates regular spatial patterns that may not be obvious in the aggregate table. For this sample, the heatmaps concentrate error around high-frequency visual structures rather than showing an obvious global grid pattern.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{no_tiling_comparison.jpg}\\[3pt]
+\includegraphics[width=0.96\textwidth]{tile256_comparison.jpg}\\[3pt]
+\includegraphics[width=0.96\textwidth]{tile512_comparison.jpg}
+\caption{Existing comparison panels for no tiling, $256 \times 256$ tiling, and $512 \times 512$ tiling. Each row shows original preview, reconstruction, and absolute-error heatmap for the same representative image.}
+\label{fig:tiling-comparisons}
 \end{figure*}
 
 \subsection{Resolution Reduction Is Fast but Quality-Limited}
 
-Resolution reduction provides the largest raw speedup, but it changes the image content available to downstream tasks. In the compression-side validation, reducing the longest edge to 4K lowered time from 144.32 to 28.89 seconds per image and memory from 52.0 to 29.0 GB. Reducing to 2K lowered time to 7.36 seconds and memory to 7.47 GB, but SSIM dropped to 0.689. The 1K setting was faster again, but the quality loss was too large for detailed disaster-imagery inspection.
+Resolution reduction gives the largest raw speedup, but it changes the information available to downstream tasks. In the compression-side validation, reducing the longest edge to 4K lowers time from 144.32 to 28.89 seconds per image and peak memory from 52.00 to 28.98 GB. Reducing to 2K lowers time to 7.36 seconds and memory to 7.47 GB, but SSIM drops to 0.689. The 1K setting is faster again, but the quality loss is too large for detailed visual inspection unless a downstream task confirms that such coarse imagery is adequate.
 
 \begin{table}[t]
 \caption{Resolution sweep on DeltaAI GH200, 20 images, baseline checkpoint.}
 \label{tab:resolution}
 \centering
-\begin{tabular}{l r r r r r}
-\hline
+\begin{tabular}{lrrrrr}
+\toprule
 Resolution & Sec. & GB & Ratio & PSNR & SSIM\\
-\hline
+\midrule
 Native & 144.32 & 52.00 & 71.20$\times$ & 29.45 & 0.873\\
 4K & 28.89 & 28.98 & 72.92$\times$ & 28.26 & 0.847\\
 2K & 7.36 & 7.47 & 81.31$\times$ & 24.05 & 0.689\\
 1K & 1.94 & 2.01 & 77.83$\times$ & 21.95 & 0.610\\
-\hline
+\bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Batching Does Not Improve the 2K Controlled Run}
+\subsection{Batch Size Does Not Improve the Controlled 2K Run}
 
-The controlled 2K batch-size sweep shows that larger batches do not improve throughput in the current implementation. Batch size 1 runs at 7.35 seconds per image and uses 7.47 GB of GPU memory. Batch size 2 slows to 11.60 seconds per image and uses 14.64 GB. Batch size 4 improves over batch size 2 but remains slower than batch size 1 while using 28.96 GB. These results support batch size 1 as the default for the current workflow.
+The controlled 2K batch-size sweep shows that larger batches do not improve throughput in the current implementation. Batch size 1 takes 7.35 seconds per image and uses 7.47 GB. Batch size 2 slows to 11.60 seconds per image and uses 14.64 GB. Batch size 4 takes 9.29 seconds per image and uses 28.96 GB. The result supports batch size 1 as the default for the current workflow. The likely reason is that batching increases memory pressure without increasing effective throughput enough to offset overhead.
 
-\subsection{Checkpoint Selection Controls the Storage-Quality Trade-Off}
+\begin{table}[t]
+\caption{Controlled 2K batch-size sweep, 20 images.}
+\label{tab:batch}
+\centering
+\begin{tabular}{rrrrr}
+\toprule
+Batch & Sec./image & GB & PSNR & SSIM\\
+\midrule
+1 & 7.35 & 7.47 & 24.04 & 0.6886\\
+2 & 11.60 & 14.64 & 24.04 & 0.6887\\
+4 & 9.29 & 28.96 & 24.04 & 0.6886\\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Because the x-parameterized path does not expose a direct runtime quality parameter, the practical compression level comes from checkpoint selection. Table~\ref{tab:checkpoints} summarizes representative checkpoints. Runtime stays near 144 seconds per image for all listed checkpoints, while compression ratio and quality change substantially. The strongest listed compression setting, \texttt{checkpoint\_b00128}, reaches 165.73$\times$ compression with lower SSIM. The \texttt{checkpoint\_b00512} setting has the highest SSIM in this table and a lower compression ratio. The \texttt{checkpoint\_b00064} setting provides a middle operating point with 93.11$\times$ compression and SSIM 0.880.
+\subsection{Checkpoint Choice Controls the Storage-Quality Trade-Off}
+
+The x-parameterized CDC path exposes compression level through checkpoint choice. Table~\ref{tab:checkpoints} shows representative checkpoint results on native full-resolution images. Runtime stays near 144 seconds per image for all listed checkpoints, so checkpoint choice mainly changes BPP-derived compression ratio and quality. The high-compression \texttt{b00128} checkpoint reaches 165.73$\times$ compression with lower SSIM. The \texttt{b00512} checkpoint has higher SSIM and a lower compression ratio. The \texttt{b00064} checkpoint is a balanced candidate, with 93.11$\times$ compression and SSIM 0.880.
 
 \begin{table}[t]
 \caption{Checkpoint-controlled compression settings on native full-resolution images, 20-image validation.}
 \label{tab:checkpoints}
 \centering
-\begin{tabular}{l r r r r}
-\hline
-Checkpoint & Sec. & Ratio & PSNR & SSIM\\
-\hline
-\texttt{b00512} & 143.73 & 32.67$\times$ & 34.84 & 0.942\\
-\texttt{b00064} & 143.66 & 93.11$\times$ & 33.73 & 0.880\\
-\texttt{b00128} & 143.70 & 165.73$\times$ & 31.52 & 0.828\\
-\texttt{b02048} & 143.70 & 71.20$\times$ & 29.45 & 0.873\\
-\hline
+\begin{tabular}{lrrrrr}
+\toprule
+Checkpoint & BPP & Sec. & Ratio & PSNR & SSIM\\
+\midrule
+\texttt{b00512} & 0.7345 & 143.73 & 32.67$\times$ & 34.84 & 0.942\\
+\texttt{b00064} & 0.2578 & 143.66 & 93.11$\times$ & 33.73 & 0.880\\
+\texttt{b00128} & 0.1448 & 143.70 & 165.73$\times$ & 31.52 & 0.828\\
+\texttt{b02048} & 0.3371 & 143.70 & 71.20$\times$ & 29.45 & 0.873\\
+\bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Storage Placement Has Little Effect in the Current Run}
 
-The storage comparison showed almost no difference between shared filesystem access and node-local staged input for the native baseline. Shared storage took 143.86 seconds per image, while local staging took 143.89 seconds per image. This result suggests that the current workflow is compute-bound under the tested configuration. It does not rule out I/O effects for larger concurrent runs, but it makes local staging a lower-priority optimization than tiling, denoising-step control, and checkpoint selection.
+The storage comparison shows almost no difference between shared project filesystem access and node-local staged input. Shared storage takes 143.86 seconds per image, while local staging takes 143.89 seconds per image. This suggests that the tested native baseline is compute-bound rather than I/O-bound. This conclusion should not be generalized to all future runs: larger concurrent jobs or different filesystem pressure could change the result. For the current workflow, however, tiling and denoising-step control are higher-priority optimizations than local staging.
+
+\subsection{Hardware Sensitivity: GH200 and H200 Quick Check}
+
+A limited Delta H200 check was run for steps 5, 20, and 65. Table~\ref{tab:h200} compares the matched fp32 rows. H200 is slightly faster in these quick checks, but the difference is small relative to the effect of denoising steps or tiling. We therefore treat hardware comparison as future work rather than a central claim.
+
+\begin{table}[t]
+\caption{Quick fp32 step comparison. H200 rows are a limited check, not a full benchmark.}
+\label{tab:h200}
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+System & Steps & Sec./image & PSNR & SSIM\\
+\midrule
+GH200 & 5 & 11.27 & 31.57 & 0.9066\\
+H200 & 5 & 10.87 & 31.56 & 0.9066\\
+GH200 & 20 & 44.37 & 30.47 & 0.8961\\
+H200 & 20 & 42.74 & 30.48 & 0.8961\\
+GH200 & 65 & 143.67 & 29.92 & 0.8845\\
+H200 & 65 & 138.48 & 29.92 & 0.8846\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Discussion}
 
-The main result is that the full-resolution CDC workflow is feasible on DeltaAI GH200 but inefficient if it processes each image as one native tensor. The baseline uses about 52 GB of GPU memory per image and takes about 144 seconds per image at 65 denoising steps. That operating point is acceptable for a small validation set, but it is too expensive for repeated large disaster-imagery archives.
+\subsection{The Main Operating Point}
 
-Tiling changes the cost profile. The $256 \times 256$ setting keeps the same native image dimensions at the workflow boundary, but it moves most of the computation to small tile tensors. That choice cuts peak memory from 52.01 GB to 1.66 GB and lowers time from 144.35 to 79.84 seconds per image. The quality metrics decline slightly, but the change is modest compared with the memory reduction. The remaining risk is visual: small scalar changes do not guarantee that tile seams are invisible. For that reason, the visual QA panel is not decorative. It is part of the evidence needed to accept a tiled operating point.
+The selected $256 \times 256$ tiling configuration is the strongest current operating point because it changes the most limiting systems quantity: memory. Moving from 52.01 GB to 1.66 GB peak memory changes how the workflow can be scheduled. It lowers the risk of out-of-memory failures, leaves room for larger surrounding pipelines, and makes concurrent processing more realistic. The runtime improvement is also meaningful: a 50-image validation run moves from about two hours at the no-tiling baseline to about 1.1 hours at the selected tiling setting, before considering queue and parallelization effects.
 
-Resolution reduction provides a different kind of saving. It is much faster than tiling, but it also removes spatial detail before compression. For workflows that only need coarse scene context, 2K or 1K inputs may be adequate. For damage assessment, object localization, and visual evidence, however, the quality drop in the 2K and 1K rows is likely too large unless downstream task accuracy confirms otherwise.
+\subsection{Why Not Use Resolution Reduction Alone?}
 
-Checkpoint selection should be treated as a first-class experimental control. The current x-parameterized workflow does not support a simple runtime compression-level parameter. Reporting only a checkpoint name would make the result hard to interpret, so this draft reports checkpoint, BPP-derived compression ratio, PSNR, and SSIM together. The checkpoint sweep also shows that runtime is not the main differentiator across compression settings; the main change is the storage-quality trade-off.
+Resolution reduction is tempting because it is fast. The 2K setting is roughly 20$\times$ faster than native full-resolution processing in the measured compression-side validation. However, it changes the visual information before compression. For disaster-response inspection, this can be unacceptable: small roof damage, debris lines, street-level obstructions, and building-edge features may disappear. The right question is therefore not "which setting is fastest?" but "which setting preserves the evidence needed by the next task?" Tiling is more attractive because it keeps the native image boundary available while reducing memory pressure.
 
-The study has several limitations. The sample sizes are small, and the current visual QA uses selected representative examples. The experiments report image-quality metrics rather than downstream disaster-analysis accuracy. The fp16 path is promising for memory and speed but cannot yet be used for BPP-based reporting because the current output records invalid BPP values. Finally, the Delta H200 comparison is only a quick check and should not be treated as a full cross-system benchmark.
+\subsection{Compression Ratio Is Not Enough}
+
+The checkpoint sweep shows why compression ratio cannot be reported alone. The \texttt{b00128} checkpoint gives a high compression ratio, but at lower SSIM. The \texttt{b00512} checkpoint gives stronger quality but lower compression. The correct checkpoint depends on whether the downstream user values storage savings, visual fidelity, or classification performance. A future version of this work should choose checkpoints using task-level metrics, not only PSNR and SSIM.
+
+\subsection{Implications for Disaster-Response Workflows}
+
+The disaster-imagery setting makes hallucination and loss of detail especially important. Generative visual systems can produce plausible outputs that do not preserve critical structural evidence \cite{yang2026satellite}. Damage-assessment models can also depend on subtle pre- and post-event differences \cite{yang2025hyperlocal}. A CDC workflow for this domain should therefore be conservative: it should expose heatmaps, preserve raw links to original data, and mark configurations that have not been validated with downstream tasks.
+
+\section{Limitations and Threats to Validity}
+
+This draft has four main limitations. First, the selected validation uses 50 full-resolution images and the compression-side validation uses 20 images. These runs identify promising operating points, but they are not yet a statistically broad benchmark across many disaster scenes. Second, the visual QA panels show representative examples. A final study should inspect more images and report artifact frequencies. Third, the current metrics are image-level fidelity metrics, not downstream damage-assessment accuracy. The final recommendation should be tested with tasks such as road obstruction detection, building-damage classification, or human visual inspection. Fourth, the fp16 path is not ready for compression-ratio reporting because BPP values are invalid in the current outputs. This is an implementation issue, not evidence that fp16 is unusable.
+
+\section{Future Work}
+
+The next version of this paper should add three experiments. First, run the selected $256 \times 256$ and $512 \times 512$ settings on a larger sample and include artifact-frequency reporting. Second, evaluate downstream task performance using disaster-analysis tasks related to street-view and cross-view damage assessment. Third, separate model compression choices from systems choices by testing checkpoint selection under the same tiling and denoising-step settings.
 
 \section{Conclusion}
 
-This paper turns a CDC image-compression model into a measurable HPC workflow for 4K-5K drone imagery. The experiments show that native full-image CDC processing on DeltaAI GH200 is feasible but expensive, while tiled processing is a practical path toward lower memory and faster turnaround. The selected $256 \times 256$ tiling configuration reduces runtime by 44.7\% and peak GPU memory by about 31.3$\times$ relative to no tiling on 50 full-resolution images, with small scalar quality losses relative to $512 \times 512$ tiling. For the next draft, the highest-value additions are a full related-work section, larger validation runs, downstream task checks, and a visual artifact audit across more images.
+This paper evaluates CDC as a cost-aware HPC workflow for high-resolution drone imagery. The central finding is practical: native full-image CDC is feasible on DeltaAI GH200, but it is too slow and memory-heavy to be the default operating point. Tiling changes the cost profile. On 50 full-resolution images, $256 \times 256$ tiling reduces runtime by 44.7\% and peak memory by 31.3$\times$ relative to no tiling, with small scalar quality losses relative to $512 \times 512$ tiling. Resolution reduction and checkpoint selection remain useful controls, but they should be chosen with downstream visual-evidence needs in mind. The broader lesson is that neural compression for disaster imagery should be evaluated as an end-to-end system: storage, runtime, memory, fidelity, and visual artifact evidence all belong in the same table.
 
 \section*{Acknowledgment}
 
