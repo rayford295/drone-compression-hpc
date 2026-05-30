@@ -11,9 +11,9 @@ This folder contains the editable SC26 CDC update deck covering three completed 
 | File | Use |
 | --- | --- |
 | `SC26_CDC_Yifan_Jacob_Poster_Update_2026-05-22.pptx` | Standalone editable PowerPoint deck |
-| `output/SC26_CDC_Yifan_Jacob_Poster_Update_2026-05-22.pptx` | Build output copy |
 | `src/create_yifan_jacob_poster_update_deck.mjs` | Rebuild script |
-| `scratch/previews/` | Rendered PNG previews for visual QA |
+
+Generated `output/` and `scratch/` files are local build artifacts and are not tracked.
 
 ## Rebuild
 

@@ -4,16 +4,33 @@ Lossy image compression with Conditional Diffusion Models, adapted for running o
 
 Based on: [Lossy Image Compression with Conditional Diffusion Models](https://arxiv.org/pdf/2209.06950.pdf)
 
+## Current Repository Map
+
+Start here if you only need the current public-facing materials:
+
+| Path | Use |
+|------|-----|
+| `paper/submission/` | SC26 Research Posters package: poster draft, IEEE-format summary, planned updates, and optional artifact appendix |
+| `paper/` | Longer paper-style LaTeX draft and compiled PDF |
+| `results/` | Lightweight, GitHub-safe result tables and downsampled visual examples |
+| `experiments/compression/` | DeltaAI experiment runners, SLURM scripts, summarizers, and poster-panel helpers |
+| `docs/` | Dated runbooks and progress notes that explain how each result package was produced |
+| `slides/` | Editable PowerPoint decks and rebuild scripts; generated `output/` and `scratch/` files are intentionally not tracked |
+| `xparam/`, `epsilonparam/` | Model code adapted from the CDC implementation |
+
+Raw drone images, checkpoints, full DeltaAI output folders, logs, generated slide previews, and local cache files are intentionally excluded from the repository.
+
 ## SC26 Experiment Snapshot
 
-Updated: 2026-05-21
+Updated: 2026-05-30
 
 This repository is now organized around the SC26 CDC experiment design:
 
 | Owner | Pipeline | Main question | Current status |
 |-------|----------|---------------|----------------|
-| Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and GH200 100-image results are documented below. |
-| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-05-15 selected run makes `256 x 256` the speed and memory candidate. The next poster task adds original/reconstruction/hot-difference panels before 2026-05-24. |
+| Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
+| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-05-15 selected run makes `256 x 256` the speed and memory candidate. |
+| Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
 

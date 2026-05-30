@@ -7,9 +7,9 @@ This folder contains the editable slide deck for the SC26 CDC tiling update.
 | File | Use |
 |------|-----|
 | `SC26_CDC_Yifan_Tiling_Progress_2026-05-12.pptx` | Standalone editable PowerPoint deck for sharing |
-| `output/SC26_CDC_Yifan_Tiling_Progress_2026-05-12.pptx` | Build output copy of the same deck |
 | `src/create_yifan_tiling_progress_deck.mjs` | Rebuild script for the deck |
-| `scratch/previews/` | Rendered PNG previews used for visual QA |
+
+Generated `output/` and `scratch/` files are local build artifacts and are not tracked.
 
 ## Coverage
 
