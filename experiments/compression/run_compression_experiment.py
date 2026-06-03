@@ -75,6 +75,8 @@ class ExperimentConfig:
     save_visual_limit: int = 2
     save_all_images: bool = False
     comparison_max_edge: int = 1600
+    compute_lpips: bool = False
+    lpips_max_edge: int = 512
     storage_label: str = "shared"
     notes: str = ""
 
@@ -134,6 +136,17 @@ def parse_args() -> ExperimentConfig:
             "Use 0 for native size."
         ),
     )
+    parser.add_argument(
+        "--compute_lpips",
+        action="store_true",
+        help="Compute LPIPS on downsampled original/reconstruction pairs.",
+    )
+    parser.add_argument(
+        "--lpips_max_edge",
+        type=int,
+        default=512,
+        help="Longest edge used for LPIPS metric. Use 0 only if full-resolution LPIPS fits in memory.",
+    )
     parser.add_argument("--storage_label", default="shared")
     parser.add_argument("--notes", default="")
     args = parser.parse_args()
@@ -146,6 +159,8 @@ def parse_args() -> ExperimentConfig:
         raise ValueError("--tile_batch_size must be >= 0")
     if args.comparison_max_edge < 0:
         raise ValueError("--comparison_max_edge must be >= 0")
+    if args.lpips_max_edge < 0:
+        raise ValueError("--lpips_max_edge must be >= 0")
     return ExperimentConfig(**vars(args))
 
 
@@ -225,6 +240,22 @@ def build_and_load_model(ckpt_path: str, device: torch.device, lpips_weight: flo
     diffusion.to(device)
     diffusion.eval()
     return diffusion
+
+
+def build_lpips_metric(device: torch.device) -> torch.nn.Module:
+    try:
+        import lpips
+    except ImportError as exc:
+        raise RuntimeError(
+            "LPIPS metric requested, but the lpips package is not installed. "
+            "Install it or rerun without --compute_lpips."
+        ) from exc
+
+    metric = lpips.LPIPS(net="alex").to(device)
+    metric.eval()
+    for param in metric.parameters():
+        param.requires_grad_(False)
+    return metric
 
 
 def list_images(img_dir: pathlib.Path, start_index: int, n_images: int) -> list[pathlib.Path]:
@@ -329,8 +360,38 @@ def compute_reconstruction_metrics(original: torch.Tensor, reconstructed: torch.
     }
 
 
+def compute_lpips_distance(
+    original: torch.Tensor,
+    reconstructed: torch.Tensor,
+    lpips_model: torch.nn.Module,
+    max_edge: int,
+    device: torch.device,
+) -> float:
+    """Compute LPIPS on a bounded-size preview to avoid full-resolution memory spikes."""
+    orig = resize_preview(original.detach().clamp(0, 1).cpu().float(), max_edge).to(device)
+    recon = resize_preview(reconstructed.detach().clamp(0, 1).cpu().float(), max_edge).to(device)
+    with torch.no_grad():
+        value = lpips_model(orig * 2.0 - 1.0, recon * 2.0 - 1.0)
+    return float(value.detach().mean().cpu().item())
+
+
+def add_optional_lpips(
+    metrics: dict[str, float],
+    original: torch.Tensor,
+    reconstructed: torch.Tensor,
+    lpips_model: torch.nn.Module | None,
+    lpips_max_edge: int,
+    device: torch.device,
+) -> dict[str, float]:
+    if lpips_model is None:
+        return metrics
+    updated = dict(metrics)
+    updated["lpips"] = compute_lpips_distance(original, reconstructed, lpips_model, lpips_max_edge, device)
+    return updated
+
+
 def round_metrics(metrics: dict[str, float]) -> dict[str, float]:
-    return {
+    rounded = {
         "psnr_db": round(metrics["psnr_db"], 4),
         "ssim": round(metrics["ssim"], 6),
         "mse": round(metrics["mse"], 8),
@@ -342,6 +403,9 @@ def round_metrics(metrics: dict[str, float]) -> dict[str, float]:
         "bias_mean": round(metrics["bias_mean"], 8),
         "error_std": round(metrics["error_std"], 8),
     }
+    if "lpips" in metrics:
+        rounded["lpips"] = round(metrics["lpips"], 8)
+    return rounded
 
 
 def resize_preview(tensor: torch.Tensor, max_edge: int) -> torch.Tensor:
@@ -468,11 +532,16 @@ def run_full_image(
     device: torch.device,
     device_index: int,
     visuals_dir: pathlib.Path,
+    lpips_model: torch.nn.Module | None,
 ) -> list[dict[str, object]]:
     timer = CudaTimer(device_index)
     prepared = []
     for path in selected:
+        prepare_wall_start = time.perf_counter()
+        prepare_cpu_start = time.process_time()
         tensor, meta = prepare_image(path, config.max_edge)
+        meta["data_prepare_sec"] = time.perf_counter() - prepare_wall_start
+        meta["data_prepare_cpu_sec"] = time.process_time() - prepare_cpu_start
         prepared.append((path, tensor, meta))
     prepared = common_crop(prepared)
 
@@ -489,6 +558,7 @@ def run_full_image(
 
         torch.cuda.reset_peak_memory_stats(device_index)
         batch_start_ts = timestamp_fields("batch_start")
+        process_cpu_start = time.process_time()
         wall_start = time.perf_counter()
         batch_tensor = batch_tensor_cpu.to(device)
         timer.start()
@@ -508,16 +578,37 @@ def run_full_image(
         bpp_values = bpp.detach().float().cpu().reshape(-1).tolist()
         postproc_sec = time.perf_counter() - post_start
         wall_sec = time.perf_counter() - wall_start
+        process_cpu_sec = time.process_time() - process_cpu_start
         batch_end_ts = timestamp_fields("batch_end")
 
         for item_index, path in enumerate(batch_paths):
             recon_single = reconstructed[item_index : item_index + 1]
             orig_single = batch_tensor_cpu[item_index : item_index + 1]
-            quality_metrics = round_metrics(compute_reconstruction_metrics(orig_single, recon_single))
+            quality_metrics = round_metrics(
+                add_optional_lpips(
+                    compute_reconstruction_metrics(orig_single, recon_single),
+                    orig_single,
+                    recon_single,
+                    lpips_model,
+                    config.lpips_max_edge,
+                    device,
+                )
+            )
             bpp_val = float(bpp_values[item_index])
             width = int(batch_metas[item_index]["width"])
             height = int(batch_metas[item_index]["height"])
             estimated_bytes = estimated_bytes_from_bpp(width, height, bpp_val)
+            data_prepare_sec = float(batch_metas[item_index].get("data_prepare_sec", 0.0))
+            data_prepare_cpu_sec = float(batch_metas[item_index].get("data_prepare_cpu_sec", 0.0))
+            per_image_wall_sec = wall_sec / effective_batch_size
+            per_image_inference_sec = batch_inference_sec / effective_batch_size
+            per_image_postproc_sec = postproc_sec / effective_batch_size
+            per_image_process_cpu_sec = data_prepare_cpu_sec + process_cpu_sec / effective_batch_size
+            pipeline_sec = data_prepare_sec + per_image_wall_sec
+            non_gpu_sec = max(0.0, pipeline_sec - per_image_inference_sec)
+            process_cpu_util_pct = (
+                per_image_process_cpu_sec / pipeline_sec * 100.0 if pipeline_sec > 0 else float("nan")
+            )
             visual_paths: dict[str, object] = {
                 "recon_path": "",
                 "recon_png_bytes": "",
@@ -563,9 +654,14 @@ def run_full_image(
                     "height": height,
                     "num_tiles": 0,
                     "batch_inference_sec": round(batch_inference_sec, 4),
-                    "inference_sec": round(batch_inference_sec / effective_batch_size, 4),
-                    "wall_sec": round(wall_sec / effective_batch_size, 4),
-                    "postproc_sec": round(postproc_sec / effective_batch_size, 4),
+                    "inference_sec": round(per_image_inference_sec, 4),
+                    "wall_sec": round(per_image_wall_sec, 4),
+                    "data_prepare_sec": round(data_prepare_sec, 4),
+                    "pipeline_sec": round(pipeline_sec, 4),
+                    "non_gpu_sec": round(non_gpu_sec, 4),
+                    "postproc_sec": round(per_image_postproc_sec, 4),
+                    "process_cpu_sec": round(per_image_process_cpu_sec, 4),
+                    "process_cpu_util_pct": round(process_cpu_util_pct, 2),
                     "peak_gpu_mem_mb": round(peak_mem_mb, 1),
                     "bpp": round(bpp_val, 6),
                     "estimated_compressed_bytes": estimated_bytes if estimated_bytes is not None else "",
@@ -629,6 +725,7 @@ def run_tiled(
     device: torch.device,
     device_index: int,
     visuals_dir: pathlib.Path,
+    lpips_model: torch.nn.Module | None,
 ) -> list[dict[str, object]]:
     tile_batch_size = config.tile_batch_size or config.batch_size
     timer = CudaTimer(device_index)
@@ -637,8 +734,13 @@ def run_tiled(
 
     for image_index, path in enumerate(selected):
         image_start_ts = timestamp_fields("image_start")
+        process_cpu_start = time.process_time()
         wall_start = time.perf_counter()
+        prepare_wall_start = time.perf_counter()
+        prepare_cpu_start = time.process_time()
         tensor, meta = prepare_image(path, config.max_edge)
+        data_prepare_sec = time.perf_counter() - prepare_wall_start
+        data_prepare_cpu_sec = time.process_time() - prepare_cpu_start
         original = tensor.clone()
         padded, pad_h, pad_w = pad_to_tile_multiple(tensor, config.tile_size)
         padded_h, padded_w = padded.shape[-2:]
@@ -678,7 +780,16 @@ def run_tiled(
             torch.cuda.empty_cache()
 
         stitched = stitched[:, :, : meta["height"], : meta["width"]]
-        quality_metrics = round_metrics(compute_reconstruction_metrics(original, stitched))
+        quality_metrics = round_metrics(
+            add_optional_lpips(
+                compute_reconstruction_metrics(original, stitched),
+                original,
+                stitched,
+                lpips_model,
+                config.lpips_max_edge,
+                device,
+            )
+        )
         seam_mean, seam_max = seam_artifact_metrics(original, stitched, config.tile_size)
 
         total_bits = 0.0
@@ -687,6 +798,9 @@ def run_tiled(
         effective_bpp = total_bits / float(meta["width"] * meta["height"])
         estimated_bytes = estimated_bytes_from_bpp(meta["width"], meta["height"], effective_bpp)
         wall_sec = time.perf_counter() - wall_start
+        process_cpu_sec = time.process_time() - process_cpu_start
+        non_gpu_sec = max(0.0, wall_sec - total_inference_sec)
+        process_cpu_util_pct = process_cpu_sec / wall_sec * 100.0 if wall_sec > 0 else float("nan")
         image_end_ts = timestamp_fields("image_end")
 
         visual_paths: dict[str, object] = {
@@ -736,7 +850,12 @@ def run_tiled(
                 "batch_inference_sec": round(total_inference_sec, 4),
                 "inference_sec": round(total_inference_sec, 4),
                 "wall_sec": round(wall_sec, 4),
+                "data_prepare_sec": round(data_prepare_sec, 4),
+                "pipeline_sec": round(wall_sec, 4),
+                "non_gpu_sec": round(non_gpu_sec, 4),
                 "postproc_sec": "",
+                "process_cpu_sec": round(process_cpu_sec, 4),
+                "process_cpu_util_pct": round(process_cpu_util_pct, 2),
                 "peak_gpu_mem_mb": round(peak_mem_mb, 1),
                 "bpp": round(float(effective_bpp), 6),
                 "estimated_compressed_bytes": estimated_bytes if estimated_bytes is not None else "",
@@ -751,6 +870,7 @@ def run_tiled(
                 "pad_w": pad_w,
                 "padded_width": padded_w,
                 "padded_height": padded_h,
+                "data_prepare_cpu_sec": round(data_prepare_cpu_sec, 4),
             }
         )
         print(
@@ -834,6 +954,11 @@ def summarize_rows(
         "model_load_sec": round(model_load_sec, 4),
         "total_wall_sec": round(total_wall_sec, 4),
         "avg_wall_sec": avg("wall_sec"),
+        "avg_data_prepare_sec": avg("data_prepare_sec"),
+        "avg_pipeline_sec": avg("pipeline_sec"),
+        "avg_non_gpu_sec": avg("non_gpu_sec"),
+        "avg_process_cpu_sec": avg("process_cpu_sec"),
+        "avg_process_cpu_util_pct": avg("process_cpu_util_pct"),
         "avg_inference_sec": avg("inference_sec"),
         "avg_peak_gpu_mem_mb": avg("peak_gpu_mem_mb"),
         "max_peak_gpu_mem_mb": max_value("peak_gpu_mem_mb"),
@@ -843,6 +968,7 @@ def summarize_rows(
         else avg("compression_ratio"),
         "avg_psnr_db": avg("psnr_db"),
         "avg_ssim": avg("ssim"),
+        "avg_lpips": avg("lpips"),
         "avg_mse": avg("mse"),
         "avg_rmse": avg("rmse"),
         "avg_mae": avg("mae"),
@@ -879,12 +1005,17 @@ def write_report(path: pathlib.Path, summary: dict[str, object], config: Experim
         "batch_size",
         "n_images",
         "avg_wall_sec",
+        "avg_data_prepare_sec",
+        "avg_pipeline_sec",
+        "avg_non_gpu_sec",
+        "avg_process_cpu_util_pct",
         "avg_inference_sec",
         "avg_peak_gpu_mem_mb",
         "avg_bpp",
         "avg_compression_ratio",
         "avg_psnr_db",
         "avg_ssim",
+        "avg_lpips",
         "avg_mse",
         "avg_rmse",
         "avg_mae",
@@ -925,11 +1056,12 @@ def main() -> None:
     torch.cuda.synchronize(device_index)
     model_load_sec = time.perf_counter() - load_start
     print(f"Model loaded in {model_load_sec:.2f}s")
+    lpips_model = build_lpips_metric(device) if config.compute_lpips else None
 
     if config.tile_size:
-        rows = run_tiled(diffusion, selected, config, device, device_index, visuals_dir)
+        rows = run_tiled(diffusion, selected, config, device, device_index, visuals_dir, lpips_model)
     else:
-        rows = run_full_image(diffusion, selected, config, device, device_index, visuals_dir)
+        rows = run_full_image(diffusion, selected, config, device, device_index, visuals_dir, lpips_model)
 
     total_wall_sec = time.perf_counter() - total_start
     run_end_ts = timestamp_fields("run_end")

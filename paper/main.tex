@@ -12,37 +12,41 @@
 
 \begin{document}
 
-\title{Cost-Aware Conditional Diffusion Compression of 4K-5K Drone Imagery for Scalable Disaster-Response HPC Workflows}
+\title{Optimizing CDC Model Performance for High-Resolution Image Compression and Reconstruction under HPC Environments}
 
 \author{
-\IEEEauthorblockN{Jooho Kim\IEEEauthorrefmark{1}, Anish Shakya\IEEEauthorrefmark{2}, Yifan Yang\IEEEauthorrefmark{2}, and Jacob Kelly\IEEEauthorrefmark{2}}
-\IEEEauthorblockA{\IEEEauthorrefmark{1}Institute for a Disaster Resilient Texas, Texas A\&M University, College Station, TX, USA}
-\IEEEauthorblockA{\IEEEauthorrefmark{2}Texas A\&M University, College Station, TX, USA}
+\IEEEauthorblockN{Jooho Kim\IEEEauthorrefmark{1}, Yifan Yang\IEEEauthorrefmark{2}, Anish Shakya\IEEEauthorrefmark{3}, and Jacob Kelly\IEEEauthorrefmark{4}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Institute for a Disaster Resilient Texas (IDRT), Texas A\&M University, College Station, TX, USA}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}Department of Geography, Texas A\&M University, College Station, TX, USA}
+\IEEEauthorblockA{\IEEEauthorrefmark{3}Department of Marine and Coastal Environmental Science, Texas A\&M University, Galveston, TX, USA}
+\IEEEauthorblockA{\IEEEauthorrefmark{4}Department of Computer Science and Engineering, Texas A\&M University, College Station, TX, USA}
+\IEEEauthorblockA{Jooho Kim and Yifan Yang contributed equally to this work.}
 \IEEEauthorblockA{Corresponding author: \texttt{jooho.kim@tamu.edu}}
 }
 
 \maketitle
 
 \begin{abstract}
-High-resolution drone imagery is increasingly important for disaster response because it captures local scene evidence that complements satellite and street-view observations. The same resolution that makes these images useful also makes them expensive to store, move, and reconstruct in high-performance computing (HPC) workflows. This paper studies conditional diffusion compression (CDC) as a cost-aware compression and reconstruction strategy for 4K-5K drone imagery on GPU HPC systems. We do not propose a new neural compression architecture. Instead, we ask which operational controls make an existing CDC workflow practical for disaster-imagery workloads. We adapt an x-parameterized CDC implementation to NCSA DeltaAI, evaluate full-resolution drone images cropped to $5440 \times 3648$ pixels, and measure runtime, peak GPU memory, estimated bits per pixel (BPP), compression ratio, PSNR, SSIM, pixel-error statistics, and tile-boundary artifacts. Native full-image processing is feasible but expensive: at 65 denoising steps, the baseline uses about 52 GB of GPU memory and takes about 144 seconds per image. A selected $256 \times 256$ tiling configuration reduces runtime from 144.35 to 79.84 seconds per image and peak memory from 52.01 to 1.66 GB on 50 full-resolution images, while keeping scalar quality close to the no-tiling and $512 \times 512$ tiling references. Resolution reduction provides larger raw speedups, but it removes visual detail and degrades SSIM substantially at 2K and 1K settings. Checkpoint choice changes the storage-quality trade-off, while larger controlled-resolution batches and local storage staging do not improve throughput in the measured runs. The results show that CDC deployment for disaster imagery must be reported as a joint systems and image-quality problem: bitrate alone is not enough.
+High-resolution drone imagery supports urban monitoring and disaster assessment because it preserves fine details that coarser imagery often misses. The same detail makes large-area image collections costly to store, move, compress, and reconstruct in high-performance computing (HPC) workflows. We frame the broader system as PPO-based bitrate-allocation conditional diffusion compression (PCDC), where a conditional diffusion decoder is paired with block-wise bitrate decisions. The committed experiments in this paper evaluate the current CDC/HPC operating-point stage of that framework before reporting trained PPO policy results. We adapt an x-parameterized CDC implementation to NCSA DeltaAI, evaluate full-resolution drone images cropped to $5440 \times 3648$ pixels, and measure runtime, peak GPU memory, estimated bits per pixel (BPP), compression ratio, PSNR, SSIM, pixel-error statistics, and tile-boundary artifacts. Native full-image processing is feasible but expensive: at 65 denoising steps, the baseline uses about 52 GB of GPU memory and takes about 144 seconds per image. A selected $256 \times 256$ tiling configuration reduces runtime from 144.35 to 79.84 seconds per image and peak memory from 52.01 to 1.66 GB on 50 full-resolution images, while keeping scalar quality close to the no-tiling and $512 \times 512$ tiling references. Resolution reduction provides larger raw speedups, but it removes visual detail and degrades SSIM substantially at 2K and 1K settings. Checkpoint choice changes the storage-quality trade-off, while larger controlled-resolution batches and local storage staging do not improve throughput in the measured runs. These results show that CDC and future PCDC deployment for disaster imagery must be reported as a joint systems and image-quality problem: bitrate alone is not enough.
 \end{abstract}
 
 \begin{IEEEkeywords}
-conditional diffusion compression, drone imagery, disaster response, high-performance computing, neural compression, tiling, GPU memory
+conditional diffusion compression, PCDC, bitrate allocation, drone imagery, disaster response, high-performance computing, tiling, GPU memory
 \end{IEEEkeywords}
 
 \section{Introduction}
 
-Drone imagery has become a practical source of post-disaster visual evidence. It can capture road blockages, roof damage, flood debris, and parcel-scale changes at a level of detail that coarser remote sensing products often cannot provide. This role is adjacent to recent disaster-imagery work that uses generative cross-view synthesis to reason from satellite to street-level views \cite{yang2026satellite} and bi-temporal street-view imagery to support hyperlocal damage assessment \cite{yang2025hyperlocal}. Together, these lines of work point to a broader need: disaster-response systems need visual data that are detailed enough for inspection, but inexpensive enough to store, move, and process repeatedly.
+Drone imagery has become a practical source of visual evidence for urban monitoring and disaster assessment. It can capture road blockages, roof damage, flood debris, and parcel-scale changes at a level of detail that coarser remote sensing products often cannot provide. This role is adjacent to recent disaster-imagery work that uses generative cross-view synthesis to reason from satellite to street-level views \cite{yang2026satellite} and bi-temporal street-view imagery to support hyperlocal damage assessment \cite{yang2025hyperlocal}. Together, these lines of work point to a broader need: disaster-response systems need visual data that are detailed enough for inspection, but inexpensive enough to store, move, and process repeatedly.
 
-High-resolution drone images create a systems problem before they become a modeling problem. The images in our workflow are cropped to $5440 \times 3648$ pixels. A single 8-bit RGB frame at this resolution contains about 59.5 MB of uncompressed pixel data. A field collection with thousands of frames can therefore become a multi-hundred-gigabyte or terabyte-scale archive. In an HPC setting, the cost appears in several places: long-term storage, transfer from project filesystems to compute nodes, GPU memory pressure, queue time, and repeated decoding when analysts rerun quality checks or downstream models.
+High-resolution drone images create a systems problem before they become a modeling problem. The images in our workflow are cropped to $5440 \times 3648$ pixels. A single 8-bit RGB frame at this resolution contains about 59.5 MB of uncompressed pixel data. A large-area survey with thousands of frames can therefore become a multi-hundred-gigabyte or terabyte-scale archive. In an HPC setting, the cost appears in several places: long-term storage, transfer from project filesystems to compute nodes, GPU memory pressure, queue time, and repeated decoding when analysts rerun quality checks or downstream models.
 
 Learned image compression offers one path through this bottleneck. Autoencoder-based neural codecs and hyperprior models have shown strong rate-distortion performance \cite{balle2018hyperprior}. Diffusion models provide a different reconstruction mechanism: they can generate visually plausible details through iterative denoising \cite{ho2020ddpm}, and latent diffusion models reduce the cost of high-resolution synthesis by operating in a compact latent space \cite{rombach2022ldm}. Conditional diffusion compression (CDC) uses a diffusion decoder as part of a lossy compression system \cite{yang2022lossy}. That design is attractive for visual quality, but it introduces a practical deployment issue: diffusion decoding is iterative, and full-resolution reconstruction can be slow and memory-heavy.
 
-This paper studies CDC as an HPC workflow rather than as a new compression model. We ask: \textit{Which runtime settings make CDC usable for large drone-imagery workloads while preserving enough visual detail for disaster-response inspection?} We focus on operational choices that a research team can control without retraining the model: denoising steps, precision, resolution, tile size, tile batch size, checkpoint choice, job parallelism, and storage placement.
+The broader project frames this path as PPO-based bitrate-allocation conditional diffusion compression (PCDC). In that design, a conditional diffusion decoder is paired with block-wise bitrate allocation so that difficult image regions can receive different compression choices from easier regions. This paper reports the current CDC operating-point stage that supports that design. We ask: \textit{Which runtime settings make CDC usable for large drone-imagery workloads while preserving enough visual detail for disaster-response inspection?} We focus on operational choices that a research team can control before training or evaluating a policy allocator: denoising steps, precision, resolution, tile size, tile batch size, checkpoint choice, job parallelism, and storage placement.
 
 Our contributions are:
 \begin{itemize}
+\item We define the measurable CDC operating-point layer needed by a future PCDC policy: runtime, memory, bitrate, image quality, and artifact evidence.
 \item We adapt a CDC compression and reconstruction workflow to NCSA DeltaAI and define a reproducible experiment suite for high-resolution drone imagery.
 \item We report the cost-quality behavior of native full-resolution processing, denoising-step reduction, resolution reduction, tiling, batch-size changes, checkpoint selection, storage placement, and parallel shards.
 \item We identify $256 \times 256$ tiling as the best current runtime-memory operating point in the selected validation run, reducing peak GPU memory by 31.3$\times$ and runtime by 44.7\% relative to no tiling.
@@ -98,9 +102,11 @@ Reconstruction quality is measured with PSNR, SSIM \cite{wang2004ssim}, mean abs
 
 \section{Implementation}
 
-\subsection{CDC Path}
+\subsection{CDC and PCDC Scope}
 
-The implementation uses the x-parameterized CDC path adapted in this repository from the original CDC implementation \cite{yang2022lossy}. The x-parameterized path does not expose a direct runtime parameter named \texttt{compression\_level}, \texttt{quality}, \texttt{bitrate}, or \texttt{quantization}. Compression level is therefore controlled through checkpoint choice. The experiment suite reports checkpoint name together with measured BPP, compression ratio, PSNR, and SSIM so the compression setting is interpretable.
+PCDC denotes the planned full framework for this project: conditional diffusion reconstruction plus PPO-based block-wise bitrate allocation. The evaluated code path in the current repository is the x-parameterized CDC path adapted from the original CDC implementation \cite{yang2022lossy}. It does not yet include a trained PPO allocator, and the results below should not be read as policy-learning results.
+
+The x-parameterized path also does not expose a direct runtime parameter named \texttt{compression\_level}, \texttt{quality}, \texttt{bitrate}, or \texttt{quantization}. Compression level is therefore controlled through checkpoint choice. The experiment suite reports checkpoint name together with measured BPP, compression ratio, PSNR, and SSIM so the compression setting is interpretable. These fixed-setting results provide the cost and quality signals needed before a block-wise policy can be trained or evaluated.
 
 \subsection{Experiment Runner}
 
@@ -119,7 +125,16 @@ Native full-resolution decoding is memory-heavy because the full image tensor an
 
 \subsection{Data}
 
-The experiments use full-resolution drone images cropped to $5440 \times 3648$ pixels. The reconstruction step sweep uses a repeated profiling set. The tiling pilot uses 8 images. The selected tiling validation uses 50 images. The compression-side validation uses 20 images. These sample sizes are sufficient to identify runtime-memory regimes, but they are not yet a final large-scale benchmark. We therefore treat the results as an operating-point study.
+The experiments use urban, full-resolution drone images cropped to $5440 \times 3648$ pixels. Figure~\ref{fig:study-area} shows the study-area context, including the Texas locator map, the neighborhood-scale basemap, and representative drone-image views. The red boxes mark the repeated sampling layout used to organize image-level compression and reconstruction experiments across a dense urban scene. This data setting matches the poster motivation: high-resolution imagery preserves fine structural detail, but large-area collections can reach hundreds of gigabytes.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.96\textwidth]{study_area_drone_sampling.jpg}
+\caption{Study-area and data-description figure used for the SC26 poster. The overview map shows the urban sampling layout, the insets show representative high-resolution drone views, and the locator map marks the Texas study area. Base map source: Microsoft and Vantor.}
+\label{fig:study-area}
+\end{figure*}
+
+The reconstruction step sweep uses a repeated profiling set. The tiling pilot uses 8 images. The selected tiling validation uses 50 images. The compression-side validation uses 20 images. These sample sizes are sufficient to identify runtime-memory regimes, but they are not yet a final large-scale benchmark. We therefore treat the results as an operating-point study.
 
 \subsection{Platform}
 
@@ -327,13 +342,17 @@ H200 & 65 & 138.48 & 29.92 & 0.8846\\
 
 \section{Discussion}
 
+\subsection{From CDC Operating Points to PCDC}
+
+The PCDC framing changes how to read these experiments. The tiling, checkpoint, and resolution controls are not only manual tuning choices; they also define candidate actions and costs for future block-wise bitrate allocation. Runtime, memory, BPP, PSNR, SSIM, and seam evidence can become reward or constraint terms for a policy. The current results therefore establish the measured design space before adding PPO.
+
 \subsection{The Main Operating Point}
 
 The selected $256 \times 256$ tiling configuration is the strongest current operating point because it changes the most limiting systems quantity: memory. Moving from 52.01 GB to 1.66 GB peak memory changes how the workflow can be scheduled. It lowers the risk of out-of-memory failures, leaves room for larger surrounding pipelines, and makes concurrent processing more realistic. The runtime improvement is also meaningful: a 50-image validation run moves from about two hours at the no-tiling baseline to about 1.1 hours at the selected tiling setting, before considering queue and parallelization effects.
 
 \subsection{Why Not Use Resolution Reduction Alone?}
 
-Resolution reduction is tempting because it is fast. The 2K setting is roughly 20$\times$ faster than native full-resolution processing in the measured compression-side validation. However, it changes the visual information before compression. For disaster-response inspection, this can be unacceptable: small roof damage, debris lines, street-level obstructions, and building-edge features may disappear. The right question is therefore not "which setting is fastest?" but "which setting preserves the evidence needed by the next task?" Tiling is more attractive because it keeps the native image boundary available while reducing memory pressure.
+Resolution reduction is tempting because it is fast. The 2K setting is roughly 20$\times$ faster than native full-resolution processing in the measured compression-side validation. However, it changes the visual information before compression. For disaster-response inspection, this can be unacceptable: small roof damage, debris lines, street-level obstructions, and building-edge features may disappear. The right question is therefore not which setting is fastest. It is which setting preserves the evidence needed by the next task. Tiling is more attractive because it keeps the native image boundary available while reducing memory pressure.
 
 \subsection{Compression Ratio Is Not Enough}
 
@@ -345,19 +364,19 @@ The disaster-imagery setting makes hallucination and loss of detail especially i
 
 \section{Limitations and Threats to Validity}
 
-This draft has four main limitations. First, the selected validation uses 50 full-resolution images and the compression-side validation uses 20 images. These runs identify promising operating points, but they are not yet a statistically broad benchmark across many disaster scenes. Second, the visual QA panels show representative examples. A final study should inspect more images and report artifact frequencies. Third, the current metrics are image-level fidelity metrics, not downstream damage-assessment accuracy. The final recommendation should be tested with tasks such as road obstruction detection, building-damage classification, or human visual inspection. Fourth, the fp16 path is not ready for compression-ratio reporting because BPP values are invalid in the current outputs. This is an implementation issue, not evidence that fp16 is unusable.
+This draft has five main limitations. First, the selected validation uses 50 full-resolution images and the compression-side validation uses 20 images. These runs identify promising operating points, but they are not yet a statistically broad benchmark across many disaster scenes. Second, the visual QA panels show representative examples. A final study should inspect more images and report artifact frequencies. Third, the current metrics are image-level fidelity metrics, not downstream damage-assessment accuracy. The final recommendation should be tested with tasks such as road obstruction detection, building-damage classification, or human visual inspection. Fourth, the fp16 path is not ready for compression-ratio reporting because BPP values are invalid in the current outputs. This is an implementation issue, not evidence that fp16 is unusable. Fifth, the current repository does not yet evaluate the PPO-based block-wise bitrate allocator described by the PCDC framing.
 
 \section{Future Work}
 
-The next version of this paper should add three experiments. First, run the selected $256 \times 256$ and $512 \times 512$ settings on a larger sample and include artifact-frequency reporting. Second, evaluate downstream task performance using disaster-analysis tasks related to street-view and cross-view damage assessment. Third, separate model compression choices from systems choices by testing checkpoint selection under the same tiling and denoising-step settings.
+The next version of this paper should add four experiments. First, run the selected $256 \times 256$ and $512 \times 512$ settings on a larger sample and include artifact-frequency reporting. Second, implement and evaluate the PPO-based block-wise bitrate allocator under the PCDC framing. Third, evaluate downstream task performance using disaster-analysis tasks related to street-view and cross-view damage assessment. Fourth, separate model compression choices from systems choices by testing checkpoint selection under the same tiling and denoising-step settings.
 
 \section{Conclusion}
 
-This paper evaluates CDC as a cost-aware HPC workflow for high-resolution drone imagery. The central finding is practical: native full-image CDC is feasible on DeltaAI GH200, but it is too slow and memory-heavy to be the default operating point. Tiling changes the cost profile. On 50 full-resolution images, $256 \times 256$ tiling reduces runtime by 44.7\% and peak memory by 31.3$\times$ relative to no tiling, with small scalar quality losses relative to $512 \times 512$ tiling. Resolution reduction and checkpoint selection remain useful controls, but they should be chosen with downstream visual-evidence needs in mind. The broader lesson is that neural compression for disaster imagery should be evaluated as an end-to-end system: storage, runtime, memory, fidelity, and visual artifact evidence all belong in the same table.
+This paper evaluates CDC as a cost-aware HPC workflow for high-resolution image compression and reconstruction. The central finding is practical: native full-image CDC is feasible on DeltaAI GH200, but it is too slow and memory-heavy to be the default operating point. Tiling changes the cost profile. On 50 full-resolution images, $256 \times 256$ tiling reduces runtime by 44.7\% and peak memory by 31.3$\times$ relative to no tiling, with small scalar quality losses relative to $512 \times 512$ tiling. These measurements also define the cost and quality signals needed by the broader PCDC framework. Resolution reduction and checkpoint selection remain useful controls, but they should be chosen with downstream visual-evidence needs in mind. The broader lesson is that neural compression for disaster imagery should be evaluated as an end-to-end system: storage, runtime, memory, fidelity, and visual artifact evidence all belong in the same table.
 
 \section*{Acknowledgment}
 
-The authors thank the NCSA DeltaAI support ecosystem and project collaborators for discussions that shaped the experiment design.
+Portions of this research were conducted with advanced computing resources provided by Texas A\&M High Performance Research Computing. This work used NCSA DeltaAI and Delta resources through the Advanced Cyberinfrastructure Coordination Ecosystem: Services and Support (ACCESS) program. The authors thank the NCSA support ecosystem and project collaborators for discussions that shaped the experiment design.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

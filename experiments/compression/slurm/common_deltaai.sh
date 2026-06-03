@@ -37,7 +37,11 @@ fi
 echo "=========================================="
 
 run_sc26_compression() {
-  python experiments/compression/run_compression_experiment.py "$@"
+  local extra_args=()
+  if [[ "${COMPUTE_LPIPS:-0}" == "1" ]]; then
+    extra_args+=(--compute_lpips --lpips_max_edge "${LPIPS_MAX_EDGE:-512}")
+  fi
+  python experiments/compression/run_compression_experiment.py "$@" "${extra_args[@]}"
 }
 
 summarize_sc26_compression() {

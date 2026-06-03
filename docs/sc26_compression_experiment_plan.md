@@ -19,6 +19,9 @@ Make CDC compression fast, scalable, and storage-efficient enough for the SC26 p
 | `experiments/compression/slurm/04_hpc_scaling_array.sbatch` | Multiple jobs in parallel |
 | `experiments/compression/slurm/05_storage_compare.sbatch` | Shared filesystem vs node-local staged storage |
 | `experiments/compression/slurm/06_summarize_all.sbatch` | Final all-run summary table |
+| `experiments/compression/slurm/07_compression_tile_tradeoff.sbatch` | Practical compression-setting x tile-size subset |
+| `experiments/compression/evaluate_object_detection_impact.py` | mAP / precision / recall / F1 evaluation for downstream detection |
+| `experiments/compression/slurm/08_object_detection_impact.sbatch` | DeltaAI wrapper for downstream detection impact |
 | `experiments/compression/slurm/run_all_suite.sh` | Submits the full suite |
 | `experiments/compression/slurm/run_jacob_compression_suite.sh` | Submits Jacob's compression-side suite without tiling |
 
@@ -128,6 +131,64 @@ Quality checks:
 - visual table: original preview, reconstruction preview, absolute-error heatmap, side-by-side comparison panel, poster-ready six-panel figure
 - failure mode to watch: regular tile-boundary patterns in heatmaps or seam-region crops
 
+### Compression x Tile-Size Tradeoff
+
+The June 2 setup asks how compression setting and tile size interact. Do not run every possible combination first. Use the practical subset that covers the three checkpoint-derived compression regimes and the two current candidate tile sizes:
+
+| Role | Checkpoint | Reason |
+| --- | --- | --- |
+| high quality / low compression | `checkpoint_b00512` | strongest current quality row |
+| balanced | `checkpoint_b00064` | good storage reduction while keeping SSIM near the baseline checkpoint |
+| high compression | `checkpoint_b00128` | strongest current BPP / compression-ratio row |
+
+Default subset:
+
+```bash
+TRADEOFF_COMPRESSION_ROLES="high_quality balanced high_compression" \
+TRADEOFF_TILE_SIZES="256 512" \
+N_IMAGES=8 \
+sbatch experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
+```
+
+For final poster or manuscript numbers, raise `N_IMAGES` after the smoke subset succeeds. Use `COMPUTE_LPIPS=1` when the final quality table needs perceptual distance in addition to PSNR and SSIM.
+
+### Object Detection Impact
+
+The current committed result packages do not yet include downstream object-detection accuracy. The new evaluation script fills that gap once ground-truth YOLO labels and detector predictions are available.
+
+Minimum comparison:
+
+| Configuration | Meaning |
+| --- | --- |
+| original | detector on uncompressed original images |
+| best quality | high-quality / low-compression checkpoint or no-tiling reference |
+| balanced | selected checkpoint + selected tile size |
+| maximum compression | high-compression checkpoint + selected tile size |
+
+If prediction label folders already exist:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo \
+DETECTION_PREDICTION_DIRS="original=/path/to/original/pred_labels balanced=/path/to/balanced/pred_labels max_compression=/path/to/max/pred_labels" \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+If an Ultralytics YOLO detector should be run inside the job:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo \
+DETECTION_MODEL=/projects/bfod/$USER/models/detector.pt \
+DETECTION_IMAGE_SETS="original=/projects/bfod/$USER/cdc-deltaai/data/imgs tile256=/path/to/recon_tile256" \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+Outputs:
+
+- `detection_summary.csv`: mAP@0.5, mAP@0.5:0.95, precision, recall, F1
+- `detection_per_class.csv`: per-class AP and F1 at IoU 0.5
+- `detection_summary.md`: compact report table
+- `manifest.json`: label and prediction sources
+
 ### Poster Visual QA for 2026-05-24
 
 Jooho requested poster figures that compare the original image, reconstructed image, and a hot difference map, with supporting histogram and quality metrics. The runner now saves `*_poster_panel.png` for each saved visual example, and the helper script can backfill those panels from existing DeltaAI `visuals/` folders.
@@ -190,4 +251,18 @@ For final poster numbers, rerun with:
 
 ```bash
 TILING_SIZES="256 512" N_IMAGES=100 SAVE_VISUAL_LIMIT=8 sbatch experiments/compression/slurm/03_tiling_sweep.sbatch
+```
+
+Then run the tradeoff and detection add-ons:
+
+```bash
+TRADEOFF_COMPRESSION_ROLES="high_quality balanced high_compression" \
+TRADEOFF_TILE_SIZES="256 512" \
+N_IMAGES=50 \
+COMPUTE_LPIPS=1 \
+sbatch experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
+
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo \
+DETECTION_PREDICTION_DIRS="original=/path/to/original/pred_labels best_quality=/path/to/best/pred_labels balanced=/path/to/balanced/pred_labels max_compression=/path/to/max/pred_labels" \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
 ```

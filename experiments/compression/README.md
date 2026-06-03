@@ -16,6 +16,8 @@ This folder contains the runnable experiment scaffold for the next compression m
 | Multiple parallel jobs | `slurm/04_hpc_scaling_array.sbatch` |
 | Shared vs local storage | `slurm/05_storage_compare.sbatch` |
 | Final all-run summary | `slurm/06_summarize_all.sbatch` |
+| Practical compression x tile-size tradeoff | `slurm/07_compression_tile_tradeoff.sbatch` |
+| Downstream object-detection impact | `evaluate_object_detection_impact.py`, `slurm/08_object_detection_impact.sbatch` |
 | Jacob compression-side suite, no tiling | `slurm/run_jacob_compression_suite.sh` |
 | Combined tables | `summarize_results.py` |
 | Poster-ready visual panels | `make_poster_panels.py` |
@@ -83,12 +85,17 @@ The core table columns are:
 | `tile_batch_size` | number of tiles compressed in one model call for tiled runs |
 | `batch_size` | full-image batch size, or default tile batch size for tiled runs |
 | `avg_wall_sec` | average wall time per image |
+| `avg_data_prepare_sec` | average image read / resize / crop preparation time |
+| `avg_pipeline_sec` | average end-to-end per-image time including preparation |
+| `avg_non_gpu_sec` | average non-inference time, useful as a lightweight I/O / CPU overhead estimate |
+| `avg_process_cpu_util_pct` | process CPU time divided by wall time, reported as a percent |
 | `avg_inference_sec` | GPU-timed inference time |
 | `avg_peak_gpu_mem_mb` | peak allocated GPU memory |
 | `avg_bpp` | estimated model bitrate |
 | `avg_compression_ratio` | `24 / avg_bpp` vs uncompressed RGB |
 | `avg_psnr_db` | PSNR in decibels; higher means lower pixel-level reconstruction error |
 | `avg_ssim` | SSIM in `[0, 1]`; higher means better structural similarity |
+| `avg_lpips` | optional LPIPS perceptual distance when `COMPUTE_LPIPS=1`; lower is better |
 | `avg_mse` | mean squared pixel error on clamped `[0, 1]` RGB values |
 | `avg_rmse` | square root of MSE, in `[0, 1]` pixel-value units |
 | `avg_mae` | mean absolute pixel error, easier to read than MSE |
@@ -116,6 +123,12 @@ PSNR measures pixel-level fidelity in decibels. Higher is better. It is sensitiv
 SSIM measures structural similarity, including luminance, contrast, and local structure. Higher is better, and values closer to `1.0` mean the reconstruction keeps more of the original image structure.
 
 Use the metrics together: compression ratio reports storage savings, PSNR and MAE/RMSE report pixel error, SSIM reports structural quality, and seam metrics plus heatmaps check tiling artifacts.
+
+LPIPS is disabled by default because it adds extra model work and memory pressure. Enable it for final-quality sweeps:
+
+```bash
+COMPUTE_LPIPS=1 LPIPS_MAX_EDGE=512 N_IMAGES=8 sbatch experiments/compression/slurm/03_tiling_sweep.sbatch
+```
 
 ### Visual Difference Algorithm
 
@@ -197,6 +210,40 @@ Run shared-vs-local storage comparison:
 ```bash
 N_IMAGES=8 sbatch experiments/compression/slurm/05_storage_compare.sbatch
 ```
+
+Run the practical compression x tile-size subset requested in the June 2 setup:
+
+```bash
+TRADEOFF_COMPRESSION_ROLES="high_quality balanced high_compression" \
+TRADEOFF_TILE_SIZES="256 512" \
+N_IMAGES=8 \
+sbatch experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
+```
+
+This produces no-tiling references plus selected tiled rows for:
+
+- high quality / low compression: `checkpoint_b00512`
+- balanced: `checkpoint_b00064`
+- high compression: `checkpoint_b00128`
+
+Run downstream object-detection impact after reconstructed image folders and YOLO labels are ready:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo \
+DETECTION_PREDICTION_DIRS="original=/path/to/original/pred_labels balanced=/path/to/balanced/pred_labels max_compression=/path/to/max/pred_labels" \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+Or let the script run an Ultralytics detector if that package and model are available:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo \
+DETECTION_MODEL=/projects/bfod/$USER/models/detector.pt \
+DETECTION_IMAGE_SETS="original=/projects/bfod/$USER/cdc-deltaai/data/imgs tile256=/path/to/recon_tile256" \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+The detection output folder contains `detection_summary.csv`, `detection_per_class.csv`, `detection_summary.md`, and `manifest.json`.
 
 Submit the whole suite:
 
