@@ -188,6 +188,7 @@ Important files:
 | `results/2026-05-22-yifan-poster-visual-qa/visual_examples_small/` | Poster-ready original/reconstruction/hot-difference panels for representative tiling cases |
 | `results/2026-05-22-jacob-compression-n20/tables/combined_summary.csv` | Jacob compression-side `N_IMAGES=20` baseline, resolution, batch, checkpoint, scaling, and storage summary |
 | `results/2026-06-05-tradeoff-smoke/tables/combined_summary.csv` | `N_IMAGES=8` compression-setting x tile-size smoke matrix |
+| `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for the active `N_IMAGES=50` LPIPS tradeoff run and the next detection-impact run |
 | `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
 | `docs/progress_2026-05-14_yifan_tiling_next_steps.md` | Dated checklist for the `256 x 256` follow-up run, metrics, heatmap QA, and result-copy plan |
 | `docs/progress_2026-05-15_jacob_compression_prep.md` | DeltaAI runbook for Jacob's compression-side experiments due before 2026-05-20 |

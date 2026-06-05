@@ -24,6 +24,7 @@ Make CDC compression fast, scalable, and storage-efficient enough for the SC26 p
 | `experiments/compression/slurm/08_object_detection_impact.sbatch` | DeltaAI wrapper for downstream detection impact |
 | `experiments/compression/slurm/run_all_suite.sh` | Submits the full suite |
 | `experiments/compression/slurm/run_jacob_compression_suite.sh` | Submits Jacob's compression-side suite without tiling |
+| `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current task checklist for the N=50 LPIPS tradeoff run, GitHub packaging, and object-detection prerequisites |
 
 ## Timestamp Convention
 
