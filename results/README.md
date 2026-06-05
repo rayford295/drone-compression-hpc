@@ -15,6 +15,7 @@ Large raw outputs, full-resolution reconstructed PNGs, logs, model weights, and 
 | `2026-05-15-yifan-selected-256-512-n50/` | 2026-05-15 selected comparison | Yifan | DeltaAI GH200 `N_IMAGES=50` comparison of 256 and 512 tiling with heatmap-ready metrics |
 | `2026-05-22-yifan-poster-visual-qa/` | 2026-05-22 poster visual QA | Yifan | Poster-ready original/reconstruction/hot-difference panels for no tiling, 256 tiling, and 512 tiling |
 | `2026-05-22-jacob-compression-n20/` | 2026-05-22 compression-side validation | Jacob / Yifan | DeltaAI GH200 `N_IMAGES=20` compression baseline, resolution, batch, checkpoint, scaling, and storage comparison |
+| `2026-06-05-tradeoff-smoke/` | 2026-06-05 tradeoff smoke | Yifan | DeltaAI GH200 `N_IMAGES=8` compression-setting x tile-size matrix for high-quality, balanced, and high-compression checkpoints |
 
 ## Hardware Scope
 
