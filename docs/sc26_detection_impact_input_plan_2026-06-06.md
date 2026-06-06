@@ -38,6 +38,55 @@ find /projects/bfod/yyang48 -maxdepth 7 -type f \
 
 Result: no matching detector model was found.
 
+## Local Image Dataset Audit
+
+The local image dataset is available on Yifan's Mac at:
+
+```text
+/Users/yifn/Desktop/26 SC/OneDrive_1_2026-4-11/100_0005/
+```
+
+Audit result:
+
+- `363` image files were found.
+- The images are DJI `.JPG` files with size `5472 x 3648`.
+- No `.txt`, `.json`, `.xml`, `.yaml`, or `.csv` annotation files were found in the dataset folder.
+- The first sorted image is `100_0005_0001.JPG`.
+- The compression runner selects images by sorted filename order, so the formal `N_IMAGES=50` tradeoff run used `100_0005_0001.JPG` through `100_0005_0050.JPG` when `START_INDEX=0`.
+
+This means the local folder can provide the original image inputs, but it is not yet a ground-truth object-detection dataset.
+
+## Practical Labeling Strategy
+
+Because there are no existing labels, start with a small manual YOLO labeling pilot rather than trying to label all `363` images.
+
+Recommended pilot:
+
+- Label the first `8` images first, because the N50 tradeoff run saved visual/reconstruction outputs for `SAVE_VISUAL_LIMIT=8`.
+- Use one conservative class for the first pilot:
+
+```text
+0 vehicle
+```
+
+Reason: vehicles are visible in the drone images and are suitable for a standard object-detection sanity check. This supports a downstream computer-vision stability claim, but it should be described as vehicle-detection impact, not debris/damage detection, unless debris/damage labels are added later.
+
+Pilot target labels:
+
+```text
+labels_yolo/
+├── 100_0005_0001.txt
+├── 100_0005_0002.txt
+├── 100_0005_0003.txt
+├── 100_0005_0004.txt
+├── 100_0005_0005.txt
+├── 100_0005_0006.txt
+├── 100_0005_0007.txt
+└── 100_0005_0008.txt
+```
+
+If the pilot workflow succeeds, expand to the first `50` sorted images so the detection-impact set matches the formal N50 compression x tile-size table.
+
 ## Required Inputs
 
 To run object-detection impact, provide one of these two input sets.
