@@ -80,6 +80,25 @@ experiments/compression/evaluate_sam_mask_impact.py
 experiments/compression/slurm/09_sam_mask_impact.sbatch
 ```
 
+N50 run completed:
+
+| Item | Value |
+|------|-------|
+| Job ID | `2426827` |
+| Run stamp | `20260606_sam_vehicle_n50` |
+| State | `COMPLETED` |
+| Elapsed | `00:12:18` |
+| Result package | `results/2026-06-06-sam-mask-impact-n50/` |
+
+Summary:
+
+| configuration | mean_mask_iou | mean_dice | mean_area_ratio | failed_prompt_rate |
+|---------------|---------------|-----------|-----------------|--------------------|
+| `original` | `1.000000` | `1.000000` | `1.000000` | `0.000000` |
+| `balanced_256` | `0.705602` | `0.811042` | `1.019321` | `0.000000` |
+| `balanced_512` | `0.706134` | `0.811647` | `1.013330` | `0.000000` |
+| `max_compression_256` | `0.704829` | `0.810710` | `1.022910` | `0.000000` |
+
 Stage a SAM checkpoint outside git, for example:
 
 ```bash

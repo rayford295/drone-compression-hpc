@@ -20,6 +20,7 @@ Large raw outputs, full-resolution reconstructed PNGs, logs, model weights, and 
 | `2026-06-06-detection-label-selftest/` | 2026-06-06 detection pipeline sanity check | Yifan | DeltaAI GH200 self-test confirming the N8 draft YOLO labels and detection evaluator run end to end |
 | `2026-06-06-detection-coco-vehicle-n8/` | 2026-06-06 detection pilot | Yifan | DeltaAI GH200 COCO YOLOv8x vehicle-detection pilot comparing original, balanced, and maximum-compression reconstructions |
 | `2026-06-06-detection-coco-vehicle-n50/` | 2026-06-06 detection pilot | Yifan | DeltaAI GH200 N50 COCO YOLOv8x vehicle-detection pilot comparing original, high-quality, balanced, and maximum-compression reconstructions |
+| `2026-06-06-sam-mask-impact-n50/` | 2026-06-06 zero-shot segmentation pilot | Yifan | DeltaAI GH200 N50 Meta SAM mask-stability pilot comparing original, balanced, and maximum-compression reconstructions |
 
 ## Hardware Scope
 

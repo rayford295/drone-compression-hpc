@@ -31,7 +31,7 @@ This repository is now organized around the SC26 CDC experiment design:
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
 | Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
-| Yifan | Object-detection / zero-shot segmentation impact | How much compression can be applied before downstream computer-vision outputs degrade? | N50 COCO YOLOv8x vehicle detector pilot completed. N50 draft labels are available but still need review before formal mAP claims. Meta SAM zero-shot mask-stability evaluator is implemented and ready for a DeltaAI smoke test. |
+| Yifan | Object-detection / zero-shot segmentation impact | How much compression can be applied before downstream computer-vision outputs degrade? | N50 COCO YOLOv8x vehicle detector pilot and N50 Meta SAM mask-stability pilot completed. N50 draft labels are available but still need review before formal mAP claims. |
 | Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
@@ -259,6 +259,17 @@ Original image -> compression -> reconstruction -> same SAM prompts -> mask IoU 
 
 Meta SAM can be used as a zero-shot segmentation stability test. The recommended setup is to use the same N50 prompt boxes on the original and reconstructed images, then compare whether SAM masks change across `balanced_256`, `balanced_512`, and maximum-compression reconstructions. This does not replace detector mAP because SAM is not class-aware; it adds a shape and boundary stability signal.
 
+N50 SAM mask-stability result:
+
+| Configuration | Mean mask IoU | Mean Dice | Mean area ratio | Failed prompt rate |
+|---------------|---------------|-----------|-----------------|--------------------|
+| `original` | `1.0000` | `1.0000` | `1.0000` | `0.0000` |
+| `balanced_256` | `0.7056` | `0.8110` | `1.0193` | `0.0000` |
+| `balanced_512` | `0.7061` | `0.8116` | `1.0133` | `0.0000` |
+| `max_compression_256` | `0.7048` | `0.8107` | `1.0229` | `0.0000` |
+
+The SAM pilot shows that all prompts returned usable masks. Balanced and maximum-compression reconstructions are close on mask IoU and Dice, with `balanced_512` slightly best on this metric set.
+
 Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
 SAM evaluator details are in `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md`.
 
@@ -306,6 +317,7 @@ Important files:
 | `results/2026-06-06-detection-label-selftest/tables/detection_summary.csv` | DeltaAI self-test confirming the N8 draft vehicle labels and detection evaluator run end to end |
 | `results/2026-06-06-detection-coco-vehicle-n8/tables/detection_summary.csv` | COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
 | `results/2026-06-06-detection-coco-vehicle-n50/tables/detection_summary.csv` | N50 COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
+| `results/2026-06-06-sam-mask-impact-n50/tables/sam_mask_summary.csv` | N50 Meta SAM zero-shot mask-stability pilot for original and selected reconstructed image sets |
 | `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
 | `data/detection_pilot/labels_yolo_vehicle_n50_draft/` | Expanded auto-assisted draft N50 YOLO vehicle labels for pipeline scaling and review |
 | `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |

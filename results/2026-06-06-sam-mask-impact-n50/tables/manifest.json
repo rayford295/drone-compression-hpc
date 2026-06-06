@@ -1,0 +1,41 @@
+{
+  "job_id": "2426827",
+  "run_stamp": "20260606_sam_vehicle_n50",
+  "state": "COMPLETED",
+  "elapsed": "00:12:18",
+  "system": "DeltaAI GH200",
+  "sam_model_type": "vit_h",
+  "sam_checkpoint": "/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth",
+  "prompt_label_dir": "/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft",
+  "prompt_label_status": "draft_auto_assisted_review_required",
+  "image_set_root": "/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff",
+  "output_root": "/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_sam_vehicle_n50/09_sam_mask_impact",
+  "baseline_config": "original",
+  "num_images": 50,
+  "num_prompts": 829,
+  "prompt_batch_size": 4,
+  "image_sets": {
+    "original": "/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/original",
+    "balanced_256": "/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_256",
+    "balanced_512": "/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_512",
+    "max_compression_256": "/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/max_compression_256"
+  },
+  "generated_files_on_deltaai": [
+    "sam_mask_summary.csv",
+    "sam_mask_summary.md",
+    "sam_mask_per_image.csv",
+    "sam_mask_per_prompt.csv",
+    "manifest.json"
+  ],
+  "committed_files": [
+    "sam_mask_summary.csv",
+    "sam_mask_summary.md",
+    "manifest.json"
+  ],
+  "notes": [
+    "This package records the N50 SAM zero-shot mask-stability summary.",
+    "SAM masks were compared against the original-image baseline using fixed YOLO box prompts.",
+    "The prompt labels are draft and partly auto-assisted, so the result should be treated as a zero-shot sensitivity result until labels are reviewed.",
+    "Raw images, reconstructed images, generated masks, SAM checkpoints, and large DeltaAI output folders are not tracked in git."
+  ]
+}
