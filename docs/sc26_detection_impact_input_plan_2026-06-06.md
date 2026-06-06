@@ -10,8 +10,9 @@ The formal compression x tile-size tradeoff runs are complete and packaged:
 - Formal N50 LPIPS run: `results/2026-06-05-tradeoff-n50-lpips/`
 - Detection label self-test: `results/2026-06-06-detection-label-selftest/`
 - COCO vehicle detector pilot: `results/2026-06-06-detection-coco-vehicle-n8/`
+- N50 COCO vehicle detector pilot: `results/2026-06-06-detection-coco-vehicle-n50/`
 
-The object-detection impact pipeline now runs end to end for the N8 vehicle pilot. The formal paper-grade experiment still needs reviewed labels and preferably a project-specific detector.
+The object-detection impact pipeline now runs end to end for the N8 and N50 vehicle pilots. The formal paper-grade experiment still needs reviewed labels and preferably a project-specific detector.
 
 A complementary zero-shot segmentation route is now planned with Meta SAM. That route should compare SAM masks from identical prompts on original and reconstructed images. It is a mask-stability experiment, not a replacement for detector mAP.
 
@@ -336,6 +337,18 @@ Pilot result, job `2425670`:
 | `max_compression_256` | `0.159048` | `0.038141` | `0.069286` | `0.414530` | `0.118727` | `234` | `1400` |
 
 Interpretation: the detector-pilot workflow succeeds. The balanced reconstructions are close to the original baseline in this pilot, while maximum compression is lower on mAP and recall. Precision is low because the COCO detector produces many more boxes than the N8 draft labels, so do not report this as a formal downstream accuracy result.
+
+N50 pilot result, job `2426722`:
+
+| configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 | GT boxes | Prediction boxes |
+|---------------|---------|--------------|----------------|------------|--------|----------|------------------|
+| `original` | `0.690179` | `0.571109` | `0.063534` | `0.843185` | `0.118164` | `829` | `11002` |
+| `high_quality_512` | `0.632874` | `0.270631` | `0.062465` | `0.809409` | `0.115980` | `829` | `10742` |
+| `balanced_256` | `0.627999` | `0.271220` | `0.060070` | `0.806996` | `0.111817` | `829` | `11137` |
+| `balanced_512` | `0.622452` | `0.270333` | `0.059151` | `0.806996` | `0.110223` | `829` | `11310` |
+| `max_compression_256` | `0.588941` | `0.260333` | `0.056838` | `0.772014` | `0.105881` | `829` | `11260` |
+
+Interpretation: the N50 workflow succeeds on the larger label set. Balanced reconstructions remain closer to the original baseline than the maximum-compression stress test. Because the N50 labels are draft and partly auto-assisted, this remains a sensitivity result rather than a formal paper-grade mAP claim.
 
 ## Complementary Option: SAM Zero-Shot Segmentation Impact
 
