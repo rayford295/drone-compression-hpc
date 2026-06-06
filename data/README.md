@@ -51,16 +51,31 @@ data/detection_pilot/labels_yolo_vehicle_n8/
 It contains draft YOLO labels for `100_0005_0001.JPG` through `100_0005_0008.JPG`.
 These labels are for pipeline validation and should be reviewed before formal mAP reporting.
 
+An expanded auto-assisted draft package is tracked in:
+
+```text
+data/detection_pilot/labels_yolo_vehicle_n50_draft/
+```
+
+It contains draft YOLO labels for `100_0005_0001.JPG` through `100_0005_0050.JPG`.
+The first 8 images reuse the manual draft labels. Images 9-50 use COCO YOLOv8x `car`, `bus`, and `truck` candidates mapped to `0 vehicle` at confidence `0.40`. Review is required before formal mAP reporting.
+
 To stage them on DeltaAI:
 
 ```bash
 mkdir -p /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8
 rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
   /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8/
+
+mkdir -p /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft
+rsync -av data/detection_pilot/labels_yolo_vehicle_n50_draft/labels/ \
+  /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft/
 ```
 
 Use the staged folder as:
 
 ```bash
 DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8
+# or, for the expanded draft:
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft
 ```

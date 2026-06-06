@@ -86,6 +86,22 @@ Contents:
 
 These labels are intended to validate the object-detection-impact pipeline on the same first `8` images that were saved as visual examples during the N50 LPIPS tradeoff run. They are not yet publication-grade ground truth. Review and correction are still required before reporting formal mAP values in the paper.
 
+An expanded N50 draft package has also been added at:
+
+```text
+data/detection_pilot/labels_yolo_vehicle_n50_draft/
+```
+
+Contents:
+
+- `50` YOLO label files for `100_0005_0001.JPG` through `100_0005_0050.JPG`
+- `829` total draft vehicle boxes
+- First `8` images: existing manual draft labels
+- Images `9-50`: auto-assisted COCO YOLOv8x `car`, `bus`, and `truck` candidates mapped to `0 vehicle`
+- Auto-label confidence threshold: `0.40`, selected from an N8 calibration sweep in `threshold_sweep_n8.csv`
+
+This N50 package is useful for scaling the pipeline to the same image count as the formal N50 compression x tile-size table. It is still a draft. It should be reviewed and corrected before formal mAP reporting.
+
 ## DeltaAI Label Self-Test Completed
 
 The N8 pilot labels were staged on DeltaAI and used in a self-test where the same label folder was passed as ground truth and predictions.
@@ -147,12 +163,18 @@ cd /projects/bfod/yyang48/cdc-deltaai/code_main_641d86c
 mkdir -p /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
 rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
   /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8/
+
+mkdir -p /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft
+rsync -av data/detection_pilot/labels_yolo_vehicle_n50_draft/labels/ \
+  /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft/
 ```
 
 Then use:
 
 ```bash
 DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
+# or, for the expanded draft:
+DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft
 ```
 
 ## Required Inputs

@@ -177,6 +177,17 @@ Pilot contents:
 | Source image size | `5472 x 3648` |
 | Status | Pipeline validation only; DeltaAI self-test passed; review required before formal mAP reporting |
 
+An expanded auto-assisted draft is also available:
+
+| Item | Value |
+|------|-------|
+| Path | `data/detection_pilot/labels_yolo_vehicle_n50_draft/` |
+| Images | `100_0005_0001.JPG` through `100_0005_0050.JPG` |
+| Draft boxes | `829` |
+| Source | first 8 manual draft labels plus YOLOv8x COCO vehicle candidates for images 9-50 |
+| Auto threshold | `0.40`, selected by an N8 calibration sweep |
+| Status | Review required before formal mAP reporting |
+
 DeltaAI label/evaluator self-test:
 
 | Item | Value |
@@ -274,6 +285,7 @@ Important files:
 | `results/2026-06-06-detection-label-selftest/tables/detection_summary.csv` | DeltaAI self-test confirming the N8 draft vehicle labels and detection evaluator run end to end |
 | `results/2026-06-06-detection-coco-vehicle-n8/tables/detection_summary.csv` | COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
 | `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
+| `data/detection_pilot/labels_yolo_vehicle_n50_draft/` | Expanded auto-assisted draft N50 YOLO vehicle labels for pipeline scaling and review |
 | `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
 | `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |
 | `docs/sc26_detection_impact_input_plan_2026-06-06.md` | Input audit and checklist for the pending object-detection impact run |
