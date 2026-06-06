@@ -114,7 +114,13 @@ Main columns to compare:
 
 ## Next Experiment After N=50
 
-Run object-detection impact only after the needed inputs exist.
+Run object-detection impact only after the needed inputs exist. The current input audit found no YOLO label directory and no detector model on DeltaAI, so this experiment is pending rather than ready to submit.
+
+Detailed input plan:
+
+```text
+docs/sc26_detection_impact_input_plan_2026-06-06.md
+```
 
 Required inputs:
 
