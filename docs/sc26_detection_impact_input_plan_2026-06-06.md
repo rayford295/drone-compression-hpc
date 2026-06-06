@@ -13,6 +13,8 @@ The formal compression x tile-size tradeoff runs are complete and packaged:
 
 The object-detection impact pipeline now runs end to end for the N8 vehicle pilot. The formal paper-grade experiment still needs reviewed labels and preferably a project-specific detector.
 
+A complementary zero-shot segmentation route is now planned with Meta SAM. That route should compare SAM masks from identical prompts on original and reconstructed images. It is a mask-stability experiment, not a replacement for detector mAP.
+
 ## DeltaAI Input Audit
 
 These checks were run on `gh-login03` from:
@@ -335,19 +337,54 @@ Pilot result, job `2425670`:
 
 Interpretation: the detector-pilot workflow succeeds. The balanced reconstructions are close to the original baseline in this pilot, while maximum compression is lower on mAP and recall. Precision is low because the COCO detector produces many more boxes than the N8 draft labels, so do not report this as a formal downstream accuracy result.
 
+## Complementary Option: SAM Zero-Shot Segmentation Impact
+
+Meta SAM can add a zero-shot segmentation stability check:
+
+```text
+Original image -> compression -> reconstruction -> same SAM prompts -> mask stability metrics
+```
+
+Recommended setup:
+
+- Use the N50 prompt boxes in `data/detection_pilot/labels_yolo_vehicle_n50_draft/labels/`.
+- Convert each YOLO box to a SAM box prompt.
+- Run SAM on the original and reconstructed image sets with the same prompts.
+- Compare the reconstructed-image mask against the original-image mask for each prompt.
+
+Suggested metrics:
+
+| Metric | Meaning |
+|--------|---------|
+| `mean_mask_iou` | Mask overlap between original and reconstructed outputs |
+| `mean_dice` | Dice similarity |
+| `mean_area_ratio` | Reconstructed mask area divided by original mask area |
+| `mean_abs_area_change` | Absolute fractional mask-area change |
+| `mean_centroid_shift_px` | Pixel shift of mask centroids |
+| `failed_prompt_rate` | Fraction of prompts without a usable mask |
+
+This route is useful because SAM is zero-shot and promptable. It should be reported as segmentation stability, not detection accuracy, because SAM does not assign the vehicle class by itself.
+
+Detailed plan:
+
+```text
+docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md
+```
+
 ## Immediate Next Task
 
 For the pilot, the remaining requirements are:
 
 1. Review the `N8` draft vehicle labels and correct any missed or over-broad boxes.
 2. Prefer a project-specific detector checkpoint, such as an Ultralytics-compatible `best.pt`, or existing YOLO prediction folders. The COCO vehicle detector pilot is now complete and can be used as a workflow proof.
-3. Confirm which configurations should be evaluated:
+3. Add the SAM zero-shot mask-stability evaluator if we want a segmentation-based downstream result alongside detector mAP.
+4. Confirm which configurations should be evaluated:
    - original
    - balanced `checkpoint_b00064` plus `256 x 256`
    - balanced `checkpoint_b00064` plus `512 x 512`
    - high-compression `checkpoint_b00128` plus the selected tile size
 
-For formal paper numbers, expand and review the labels to the first `50` sorted images, or obtain the original object-detection ground truth from the data owner. If no reviewed labels and no detector weights exist yet, the formal object-detection impact experiment should remain pending rather than be reported as completed.
+For formal paper numbers, review the N50 draft labels or obtain the original object-detection ground truth from the data owner. If no reviewed labels and no detector weights exist yet, the formal object-detection impact experiment should remain pending rather than be reported as completed. The SAM route can still be used as a zero-shot mask-stability pilot if the prompts and reconstructed N50 image sets are available.
 
 ## GitHub-Safe Output Package
 

@@ -114,7 +114,7 @@ Main columns to compare:
 
 ## Next Experiment After N=50
 
-Run object-detection impact only after the needed inputs exist. The current input audit found no YOLO label directory and no detector model on DeltaAI, so this experiment is pending rather than ready to submit.
+Run object-detection impact only after the needed inputs exist. The current input audit initially found no YOLO label directory and no detector model on DeltaAI. Since then, the repository has added draft N8 and N50 vehicle labels, and the COCO YOLOv8x vehicle detector pilot has run end to end. Formal mAP reporting still needs reviewed labels and preferably a project-specific detector.
 
 Detailed input plan:
 
@@ -161,3 +161,32 @@ Expected detection outputs:
 - `manifest.json`
 
 Package only those lightweight outputs into GitHub after the detection run succeeds.
+
+## Complementary SAM Zero-Shot Segmentation Path
+
+A second downstream route should be added if we want a zero-shot foundation-model result:
+
+```text
+Original image -> compression -> reconstruction -> same SAM prompts -> mask IoU / Dice / area change / centroid shift
+```
+
+This route uses Meta SAM as a promptable segmentation model. It complements detector mAP because it asks whether compression changes zero-shot masks, not whether a class-aware detector finds the right object.
+
+Planned additions:
+
+- `experiments/compression/evaluate_sam_mask_impact.py`
+- `experiments/compression/slurm/09_sam_mask_impact.sbatch`
+- Lightweight result package under `results/YYYY-MM-DD-sam-mask-impact/`
+
+Recommended inputs:
+
+- Prompt boxes from `data/detection_pilot/labels_yolo_vehicle_n50_draft/labels/`
+- Original N50 images
+- Reconstructed N50 images for `balanced_256`, `balanced_512`, and maximum-compression settings
+- SAM checkpoint staged on DeltaAI outside git
+
+Detailed plan:
+
+```text
+docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md
+```
