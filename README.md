@@ -31,7 +31,7 @@ This repository is now organized around the SC26 CDC experiment design:
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
 | Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
-| Yifan | Object-detection impact | How much compression can be applied before downstream detection degrades? | Experiment 4 is not complete. A draft N8 vehicle-label pilot is tracked, but formal mAP reporting still needs reviewed labels and a detector checkpoint or prediction folders. |
+| Yifan | Object-detection impact | How much compression can be applied before downstream detection degrades? | Experiment 4 is not complete. A draft N8 vehicle-label pilot is tracked and the DeltaAI label/evaluator self-test passed, but formal mAP reporting still needs reviewed labels and a detector checkpoint or prediction folders. |
 | Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
@@ -175,7 +175,16 @@ Pilot contents:
 | Class | `0 vehicle` |
 | Draft boxes | `234` |
 | Source image size | `5472 x 3648` |
-| Status | Pipeline validation only; review required before formal mAP reporting |
+| Status | Pipeline validation only; DeltaAI self-test passed; review required before formal mAP reporting |
+
+DeltaAI label/evaluator self-test:
+
+| Item | Value |
+|------|-------|
+| Job ID | `2425654` |
+| Run stamp | `20260606_detection_label_selftest` |
+| Result | `self` mAP@0.5 = `1.0`, mAP@0.5:0.95 = `1.0`, precision = `1.0`, recall = `1.0`, F1 = `1.0` |
+| Result package | `results/2026-06-06-detection-label-selftest/` |
 
 Stage the pilot labels on DeltaAI after pulling the latest `main`:
 
@@ -242,6 +251,7 @@ Important files:
 | `results/2026-05-22-jacob-compression-n20/tables/combined_summary.csv` | Jacob compression-side `N_IMAGES=20` baseline, resolution, batch, checkpoint, scaling, and storage summary |
 | `results/2026-06-05-tradeoff-smoke/tables/combined_summary.csv` | `N_IMAGES=8` compression-setting x tile-size smoke matrix |
 | `results/2026-06-05-tradeoff-n50-lpips/tables/combined_summary.csv` | Formal `N_IMAGES=50` compression-setting x tile-size matrix with LPIPS |
+| `results/2026-06-06-detection-label-selftest/tables/detection_summary.csv` | DeltaAI self-test confirming the N8 draft vehicle labels and detection evaluator run end to end |
 | `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
 | `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
 | `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |

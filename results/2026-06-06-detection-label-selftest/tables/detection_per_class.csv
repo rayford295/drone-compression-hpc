@@ -1,0 +1,2 @@
+configuration,class_id,num_gt,num_predictions,ap50,precision50,recall50,f1_50
+self,0,234,234,1.0,1.0,1.0,1.0

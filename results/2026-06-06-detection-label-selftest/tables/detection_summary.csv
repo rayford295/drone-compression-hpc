@@ -1,0 +1,2 @@
+configuration,num_images_with_gt,num_images_with_predictions,num_gt,num_predictions,map50,map50_95,precision50,recall50,f1_50,macro_precision50,macro_recall50,macro_f1_50,prediction_dir
+self,8,8,234,234,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8

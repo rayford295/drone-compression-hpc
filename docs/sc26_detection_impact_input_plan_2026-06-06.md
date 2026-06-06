@@ -8,8 +8,9 @@ The formal compression x tile-size tradeoff runs are complete and packaged:
 
 - Smoke run: `results/2026-06-05-tradeoff-smoke/`
 - Formal N50 LPIPS run: `results/2026-06-05-tradeoff-n50-lpips/`
+- Detection label self-test: `results/2026-06-06-detection-label-selftest/`
 
-The next planned experiment is object-detection impact, using `experiments/compression/slurm/08_object_detection_impact.sbatch`. That job cannot run yet because the required detection inputs are missing on DeltaAI.
+The next planned formal experiment is object-detection impact, using `experiments/compression/slurm/08_object_detection_impact.sbatch`. The wrapper and evaluator are working, but the formal job cannot run yet because reviewed detection labels and a detector checkpoint or prediction folders are still missing.
 
 ## DeltaAI Input Audit
 
@@ -72,6 +73,29 @@ Contents:
 - Metadata and notes in `README.md`, `data.yaml`, `manifest.json`, and `pilot_images.txt`
 
 These labels are intended to validate the object-detection-impact pipeline on the same first `8` images that were saved as visual examples during the N50 LPIPS tradeoff run. They are not yet publication-grade ground truth. Review and correction are still required before reporting formal mAP values in the paper.
+
+## DeltaAI Label Self-Test Completed
+
+The N8 pilot labels were staged on DeltaAI and used in a self-test where the same label folder was passed as ground truth and predictions.
+
+Job summary:
+
+| Item | Value |
+|------|-------|
+| Job ID | `2425654` |
+| Run stamp | `20260606_detection_label_selftest` |
+| State | `COMPLETED` |
+| Elapsed | `00:00:06` |
+| Batch MaxRSS | `51904K` |
+| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_label_selftest/08_object_detection_impact` |
+
+Result:
+
+| configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 | GT boxes | Prediction boxes |
+|---------------|---------|--------------|----------------|------------|--------|----------|------------------|
+| `self` | `1.0` | `1.0` | `1.0` | `1.0` | `1.0` | `234` | `234` |
+
+Interpretation: the SLURM wrapper, label loader, and metric writer are functional. This is a sanity check only, not a downstream detection-impact result.
 
 ## Practical Labeling Strategy
 
