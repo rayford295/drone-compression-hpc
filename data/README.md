@@ -39,3 +39,28 @@ Edit the following lines with your actual paths:
 - `--account=YOUR_ALLOCATION`
 - `DATA_DIR=/projects/YOUR_PROJECT/data/100_0005`
 - `CKPT_DIR=/projects/YOUR_PROJECT/weights`
+
+## 4. Optional detection pilot labels
+
+A small vehicle-detection pilot label package is tracked in:
+
+```text
+data/detection_pilot/labels_yolo_vehicle_n8/
+```
+
+It contains draft YOLO labels for `100_0005_0001.JPG` through `100_0005_0008.JPG`.
+These labels are for pipeline validation and should be reviewed before formal mAP reporting.
+
+To stage them on DeltaAI:
+
+```bash
+mkdir -p /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8
+rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
+  /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8/
+```
+
+Use the staged folder as:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8
+```

@@ -1,0 +1,33 @@
+{
+  "dataset": "labels_yolo_vehicle_n8",
+  "status": "draft_pilot_review_required",
+  "source_image_dir_local": "/Users/yifn/Desktop/26 SC/OneDrive_1_2026-4-11/100_0005",
+  "source_image_size": {
+    "width": 5472,
+    "height": 3648
+  },
+  "annotation_reference_size": {
+    "width": 1368,
+    "height": 912
+  },
+  "classes": {
+    "0": "vehicle"
+  },
+  "image_count": 8,
+  "box_count_total": 234,
+  "label_counts": {
+    "100_0005_0001": 24,
+    "100_0005_0002": 32,
+    "100_0005_0003": 26,
+    "100_0005_0004": 27,
+    "100_0005_0005": 30,
+    "100_0005_0006": 36,
+    "100_0005_0007": 34,
+    "100_0005_0008": 25
+  },
+  "notes": [
+    "Pilot labels are for object-detection-impact pipeline validation.",
+    "Review and correction are required before formal mAP reporting.",
+    "Raw images are not tracked in git."
+  ]
+}

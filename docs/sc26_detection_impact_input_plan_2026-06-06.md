@@ -56,9 +56,26 @@ Audit result:
 
 This means the local folder can provide the original image inputs, but it is not yet a ground-truth object-detection dataset.
 
+## Pilot Labels Added
+
+A small GitHub-safe pilot label package has been added at:
+
+```text
+data/detection_pilot/labels_yolo_vehicle_n8/
+```
+
+Contents:
+
+- `8` YOLO label files for `100_0005_0001.JPG` through `100_0005_0008.JPG`
+- `234` total draft vehicle boxes
+- One class: `0 vehicle`
+- Metadata and notes in `README.md`, `data.yaml`, `manifest.json`, and `pilot_images.txt`
+
+These labels are intended to validate the object-detection-impact pipeline on the same first `8` images that were saved as visual examples during the N50 LPIPS tradeoff run. They are not yet publication-grade ground truth. Review and correction are still required before reporting formal mAP values in the paper.
+
 ## Practical Labeling Strategy
 
-Because there are no existing labels, start with a small manual YOLO labeling pilot rather than trying to label all `363` images.
+Because there are no existing formal labels, start with the small manual YOLO labeling pilot rather than trying to label all `363` images at once.
 
 Recommended pilot:
 
@@ -74,7 +91,7 @@ Reason: vehicles are visible in the drone images and are suitable for a standard
 Pilot target labels:
 
 ```text
-labels_yolo/
+data/detection_pilot/labels_yolo_vehicle_n8/labels/
 ├── 100_0005_0001.txt
 ├── 100_0005_0002.txt
 ├── 100_0005_0003.txt
@@ -86,6 +103,21 @@ labels_yolo/
 ```
 
 If the pilot workflow succeeds, expand to the first `50` sorted images so the detection-impact set matches the formal N50 compression x tile-size table.
+
+To stage the pilot labels on DeltaAI:
+
+```bash
+cd /projects/bfod/yyang48/cdc-deltaai/code_main_641d86c
+mkdir -p /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
+rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
+  /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8/
+```
+
+Then use:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
+```
 
 ## Required Inputs
 
@@ -153,17 +185,17 @@ sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86
 
 ## Immediate Next Task
 
-Ask the group or data owner for:
+For the pilot, the remaining requirements are:
 
-1. YOLO-format labels for the drone image subset used in this repo.
-2. The detector checkpoint used for debris or damage detection, if one exists.
-3. Confirmation of which configurations should be evaluated:
+1. Review the `N8` draft vehicle labels and correct any missed or over-broad boxes.
+2. Provide a detector checkpoint, such as an Ultralytics-compatible `best.pt`, or provide existing YOLO prediction folders.
+3. Confirm which configurations should be evaluated:
    - original
    - balanced `checkpoint_b00064` plus `256 x 256`
    - balanced `checkpoint_b00064` plus `512 x 512`
    - high-compression `checkpoint_b00128` plus the selected tile size
 
-If labels and detector weights do not exist yet, object-detection impact should be marked as pending rather than run as a failed SLURM job.
+For formal paper numbers, expand and review the labels to the first `50` sorted images, or obtain the original object-detection ground truth from the data owner. If no reviewed labels and no detector weights exist yet, the formal object-detection impact experiment should remain pending rather than be reported as completed.
 
 ## GitHub-Safe Output Package
 

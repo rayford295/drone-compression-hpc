@@ -1,0 +1,8 @@
+# Metadata-only descriptor for local review.
+# This is not a complete Ultralytics dataset until the raw images are linked
+# or copied into a matching image directory on the target machine.
+path: /Users/yifn/Desktop/26 SC/OneDrive_1_2026-4-11/100_0005
+images: pilot_images.txt
+labels: labels
+names:
+  0: vehicle
