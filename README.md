@@ -15,21 +15,23 @@ Start here if you only need the current public-facing materials:
 | `results/` | Lightweight, GitHub-safe result tables and downsampled visual examples |
 | `experiments/compression/` | DeltaAI experiment runners, SLURM scripts, summarizers, and poster-panel helpers |
 | `docs/` | Dated runbooks and progress notes that explain how each result package was produced |
+| `data/detection_pilot/` | GitHub-safe pilot labels for the pending object-detection impact experiment |
 | `slides/` | Editable PowerPoint decks and rebuild scripts; generated `output/` and `scratch/` files are intentionally not tracked |
 | `xparam/`, `epsilonparam/` | Model code adapted from the CDC implementation |
 
-Raw drone images, checkpoints, full DeltaAI output folders, logs, generated slide previews, and local cache files are intentionally excluded from the repository.
+Raw drone images, checkpoints, full DeltaAI output folders, logs, generated slide previews, and local cache files are intentionally excluded from the repository. Small pilot labels and result summaries are tracked when they are useful for reproducing the experiment workflow.
 
 ## SC26 Experiment Snapshot
 
-Updated: 2026-05-30
+Updated: 2026-06-06
 
 This repository is now organized around the SC26 CDC experiment design:
 
 | Owner | Pipeline | Main question | Current status |
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
-| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-05-15 selected run makes `256 x 256` the speed and memory candidate. |
+| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
+| Yifan | Object-detection impact | How much compression can be applied before downstream detection degrades? | Experiment 4 is not complete. A draft N8 vehicle-label pilot is tracked, but formal mAP reporting still needs reviewed labels and a detector checkpoint or prediction folders. |
 | Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
@@ -149,6 +151,56 @@ Interpretation: `512 x 512` tiling reduced wall time by about 40 percent and pea
 
 The 2026-05-15 selected `N_IMAGES=50` follow-up compared no tiling, `256 x 256`, and `512 x 512`. `256 x 256` is now the best speed and memory candidate: `79.84 s/image`, `1.66 GB` peak GPU memory, `68.24x` compression ratio, PSNR `28.78`, SSIM `0.8552`, and seam metric `0.032556`. Keep `512 x 512` as the quality-safe backup because it has slightly better PSNR, SSIM, MAE, and high-percentile error.
 
+The 2026-06-05 formal N50 LPIPS tradeoff compares high-quality, balanced, and high-compression checkpoints at `256 x 256` and `512 x 512` tiling. The current deployment recommendation is balanced `checkpoint_b00064` with `256 x 256` tiles: `79.34 s/image`, about `1.6 GB` peak GPU memory, `79.98x` compression, PSNR `33.14`, SSIM `0.8768`, and LPIPS `0.001826`. Balanced `checkpoint_b00064` with `512 x 512` tiles remains the quality-safe backup: `86.00 s/image`, about `3.0 GB` peak GPU memory, `78.48x` compression, PSNR `33.23`, SSIM `0.8782`, and LPIPS `0.001792`.
+
+## Current Object-Detection Impact Status
+
+Experiment 4 is the downstream computer-vision test:
+
+```text
+Original image -> compression -> reconstruction -> fixed object detector -> mAP / precision / recall / F1
+```
+
+The formal experiment is still pending because the DeltaAI audit did not find reviewed YOLO ground-truth labels or a detector checkpoint. To unblock pipeline testing, the repository now includes a small draft vehicle-detection pilot:
+
+```text
+data/detection_pilot/labels_yolo_vehicle_n8/
+```
+
+Pilot contents:
+
+| Item | Value |
+|------|-------|
+| Images | `100_0005_0001.JPG` through `100_0005_0008.JPG` |
+| Class | `0 vehicle` |
+| Draft boxes | `234` |
+| Source image size | `5472 x 3648` |
+| Status | Pipeline validation only; review required before formal mAP reporting |
+
+Stage the pilot labels on DeltaAI after pulling the latest `main`:
+
+```bash
+cd /projects/bfod/yyang48/cdc-deltaai/code_main_641d86c
+git pull --ff-only origin main
+
+mkdir -p /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
+rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
+  /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8/
+```
+
+Then use this ground-truth path:
+
+```bash
+DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
+```
+
+The detection job still needs one of these inputs:
+
+- `DETECTION_MODEL=/path/to/best.pt` plus image folders for original and reconstructed outputs.
+- `DETECTION_PREDICTION_DIRS="original=/path/to/original/labels balanced=/path/to/balanced/labels ..."` if prediction labels have already been generated.
+
+Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
+
 ## Results Index
 
 The report-ready reconstruction artifacts are stored by experiment cycle:
@@ -190,6 +242,8 @@ Important files:
 | `results/2026-05-22-jacob-compression-n20/tables/combined_summary.csv` | Jacob compression-side `N_IMAGES=20` baseline, resolution, batch, checkpoint, scaling, and storage summary |
 | `results/2026-06-05-tradeoff-smoke/tables/combined_summary.csv` | `N_IMAGES=8` compression-setting x tile-size smoke matrix |
 | `results/2026-06-05-tradeoff-n50-lpips/tables/combined_summary.csv` | Formal `N_IMAGES=50` compression-setting x tile-size matrix with LPIPS |
+| `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
+| `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
 | `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |
 | `docs/sc26_detection_impact_input_plan_2026-06-06.md` | Input audit and checklist for the pending object-detection impact run |
 | `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
