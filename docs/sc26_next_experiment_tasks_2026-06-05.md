@@ -172,7 +172,7 @@ Original image -> compression -> reconstruction -> same SAM prompts -> mask IoU 
 
 This route uses Meta SAM as a promptable segmentation model. It complements detector mAP because it asks whether compression changes zero-shot masks, not whether a class-aware detector finds the right object.
 
-Planned additions:
+Code added:
 
 - `experiments/compression/evaluate_sam_mask_impact.py`
 - `experiments/compression/slurm/09_sam_mask_impact.sbatch`
@@ -184,6 +184,21 @@ Recommended inputs:
 - Original N50 images
 - Reconstructed N50 images for `balanced_256`, `balanced_512`, and maximum-compression settings
 - SAM checkpoint staged on DeltaAI outside git
+
+Run a two-image smoke test before the full N50 SAM job:
+
+```bash
+RUN_STAMP=20260606_sam_vehicle_n50_smoke \
+SAM_INSTALL_SEGMENT_ANYTHING=1 \
+SAM_CHECKPOINT=/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
+SAM_MODEL_TYPE=vit_h \
+SAM_PROMPT_LABEL_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+SAM_IMAGE_SETS="original=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/original balanced_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_256 balanced_512=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_512 max_compression_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/max_compression_256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+SAM_LIMIT_IMAGES=2 \
+sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
+  experiments/compression/slurm/09_sam_mask_impact.sbatch
+```
 
 Detailed plan:
 

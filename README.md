@@ -31,7 +31,7 @@ This repository is now organized around the SC26 CDC experiment design:
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
 | Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
-| Yifan | Object-detection / zero-shot segmentation impact | How much compression can be applied before downstream computer-vision outputs degrade? | N50 COCO YOLOv8x vehicle detector pilot completed. N50 draft labels are available but still need review before formal mAP claims. A complementary Meta SAM zero-shot mask-stability experiment is planned. |
+| Yifan | Object-detection / zero-shot segmentation impact | How much compression can be applied before downstream computer-vision outputs degrade? | N50 COCO YOLOv8x vehicle detector pilot completed. N50 draft labels are available but still need review before formal mAP claims. Meta SAM zero-shot mask-stability evaluator is implemented and ready for a DeltaAI smoke test. |
 | Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
@@ -260,7 +260,7 @@ Original image -> compression -> reconstruction -> same SAM prompts -> mask IoU 
 Meta SAM can be used as a zero-shot segmentation stability test. The recommended setup is to use the same N50 prompt boxes on the original and reconstructed images, then compare whether SAM masks change across `balanced_256`, `balanced_512`, and maximum-compression reconstructions. This does not replace detector mAP because SAM is not class-aware; it adds a shape and boundary stability signal.
 
 Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
-SAM plan details are in `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md`.
+SAM evaluator details are in `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md`.
 
 ## Results Index
 
@@ -311,7 +311,9 @@ Important files:
 | `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
 | `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |
 | `docs/sc26_detection_impact_input_plan_2026-06-06.md` | Input audit and checklist for the pending object-detection impact run |
-| `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md` | Planned Meta SAM zero-shot segmentation impact experiment |
+| `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md` | Meta SAM zero-shot segmentation impact experiment plan and runbook |
+| `experiments/compression/evaluate_sam_mask_impact.py` | SAM mask-stability evaluator using fixed YOLO box prompts |
+| `experiments/compression/slurm/09_sam_mask_impact.sbatch` | DeltaAI wrapper for the SAM mask-stability evaluator |
 | `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
 | `docs/progress_2026-05-14_yifan_tiling_next_steps.md` | Dated checklist for the `256 x 256` follow-up run, metrics, heatmap QA, and result-copy plan |
 | `docs/progress_2026-05-15_jacob_compression_prep.md` | DeltaAI runbook for Jacob's compression-side experiments due before 2026-05-20 |

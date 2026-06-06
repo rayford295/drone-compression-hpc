@@ -14,7 +14,7 @@ The formal compression x tile-size tradeoff runs are complete and packaged:
 
 The object-detection impact pipeline now runs end to end for the N8 and N50 vehicle pilots. The formal paper-grade experiment still needs reviewed labels and preferably a project-specific detector.
 
-A complementary zero-shot segmentation route is now planned with Meta SAM. That route should compare SAM masks from identical prompts on original and reconstructed images. It is a mask-stability experiment, not a replacement for detector mAP.
+A complementary zero-shot segmentation route has been added with Meta SAM. That route compares SAM masks from identical prompts on original and reconstructed images. It is a mask-stability experiment, not a replacement for detector mAP.
 
 ## DeltaAI Input Audit
 
@@ -390,7 +390,7 @@ For the pilot, the remaining requirements are:
 
 1. Review the `N8` draft vehicle labels and correct any missed or over-broad boxes.
 2. Prefer a project-specific detector checkpoint, such as an Ultralytics-compatible `best.pt`, or existing YOLO prediction folders. The COCO vehicle detector pilot is now complete and can be used as a workflow proof.
-3. Add the SAM zero-shot mask-stability evaluator if we want a segmentation-based downstream result alongside detector mAP.
+3. Run the SAM zero-shot mask-stability smoke test, then the full N50 SAM job if the smoke test succeeds.
 4. Confirm which configurations should be evaluated:
    - original
    - balanced `checkpoint_b00064` plus `256 x 256`

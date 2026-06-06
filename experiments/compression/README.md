@@ -18,6 +18,7 @@ This folder contains the runnable experiment scaffold for the next compression m
 | Final all-run summary | `slurm/06_summarize_all.sbatch` |
 | Practical compression x tile-size tradeoff | `slurm/07_compression_tile_tradeoff.sbatch` |
 | Downstream object-detection impact | `evaluate_object_detection_impact.py`, `slurm/08_object_detection_impact.sbatch` |
+| SAM zero-shot mask-stability impact | `evaluate_sam_mask_impact.py`, `slurm/09_sam_mask_impact.sbatch` |
 | Jacob compression-side suite, no tiling | `slurm/run_jacob_compression_suite.sh` |
 | Combined tables | `summarize_results.py` |
 | Poster-ready visual panels | `make_poster_panels.py` |
@@ -267,6 +268,22 @@ sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
 ```
 
 COCO classes `2`, `5`, and `7` are car, bus, and truck. They are mapped to the pilot `0 vehicle` class. Use this as a detector-pipeline pilot unless a project-specific detector is available.
+
+Run SAM zero-shot mask stability after the prompt labels and matched image sets are ready:
+
+```bash
+RUN_STAMP=20260606_sam_vehicle_n50_smoke \
+SAM_INSTALL_SEGMENT_ANYTHING=1 \
+SAM_CHECKPOINT=/projects/bfod/$USER/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
+SAM_MODEL_TYPE=vit_h \
+SAM_PROMPT_LABEL_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+SAM_IMAGE_SETS="original=/projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/original balanced_256=/projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_256 balanced_512=/projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_512 max_compression_256=/projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/max_compression_256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+SAM_LIMIT_IMAGES=2 \
+sbatch experiments/compression/slurm/09_sam_mask_impact.sbatch
+```
+
+Remove `SAM_LIMIT_IMAGES=2` for the full N50 run after the smoke test succeeds. The SAM output folder contains `sam_mask_summary.csv`, `sam_mask_summary.md`, `sam_mask_per_image.csv`, `sam_mask_per_prompt.csv`, and `manifest.json`. Do not commit SAM checkpoints, raw images, generated full-resolution masks, or large visual folders.
 
 Submit the whole suite:
 

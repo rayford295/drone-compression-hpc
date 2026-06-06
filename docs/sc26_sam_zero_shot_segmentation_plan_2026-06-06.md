@@ -69,24 +69,49 @@ Suggested metrics:
 | `boundary_f1` | Boundary stability, if boundary extraction is added |
 | `failed_prompt_rate` | Fraction of prompts that fail to return a usable mask |
 
-## Planned DeltaAI Workflow
+## DeltaAI Workflow
 
-The next code addition should add:
+Code added:
 
 ```text
 experiments/compression/evaluate_sam_mask_impact.py
 experiments/compression/slurm/09_sam_mask_impact.sbatch
 ```
 
-The planned SLURM interface should look like:
+Stage a SAM checkpoint outside git, for example:
+
+```bash
+mkdir -p /projects/bfod/yyang48/cdc-deltaai/weights/sam
+# Place Meta SAM ViT-H at:
+# /projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth
+```
+
+Smoke test first:
+
+```bash
+RUN_STAMP=20260606_sam_vehicle_n50_smoke \
+SAM_INSTALL_SEGMENT_ANYTHING=1 \
+SAM_CHECKPOINT=/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
+SAM_MODEL_TYPE=vit_h \
+SAM_PROMPT_LABEL_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+SAM_IMAGE_SETS="original=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/original balanced_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_256 balanced_512=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_512 max_compression_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/max_compression_256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+SAM_LIMIT_IMAGES=2 \
+sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
+  experiments/compression/slurm/09_sam_mask_impact.sbatch
+```
+
+Then remove `SAM_LIMIT_IMAGES=2` for the full N50 run:
 
 ```bash
 RUN_STAMP=20260606_sam_vehicle_n50 \
-SAM_CHECKPOINT=/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_checkpoint.pth \
+SAM_INSTALL_SEGMENT_ANYTHING=0 \
+SAM_CHECKPOINT=/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
 SAM_MODEL_TYPE=vit_h \
 SAM_PROMPT_LABEL_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
-SAM_IMAGE_SETS="original=/path/to/original balanced_256=/path/to/balanced_256 balanced_512=/path/to/balanced_512 max_compression_256=/path/to/max_compression_256" \
-sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
+SAM_IMAGE_SETS="original=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/original balanced_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_256 balanced_512=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/balanced_512 max_compression_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff/max_compression_256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+sbatch --mem=96G --time=08:00:00 --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
   experiments/compression/slurm/09_sam_mask_impact.sbatch
 ```
 
