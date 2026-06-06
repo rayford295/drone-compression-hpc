@@ -208,6 +208,15 @@ The detection job still needs one of these inputs:
 - `DETECTION_MODEL=/path/to/best.pt` plus image folders for original and reconstructed outputs.
 - `DETECTION_PREDICTION_DIRS="original=/path/to/original/labels balanced=/path/to/balanced/labels ..."` if prediction labels have already been generated.
 
+If no project-specific detector exists, the evaluator now supports a COCO vehicle detector pilot using an Ultralytics model with `car`, `bus`, and `truck` predictions mapped to `0 vehicle`:
+
+```text
+DETECTION_CLASSES="2 5 7"
+DETECTION_CLASS_MAP="2=0 5=0 7=0"
+DETECTION_DROP_UNMAPPED=1
+DETECTION_RESTRICT_TO_GT=1
+```
+
 Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
 
 ## Results Index

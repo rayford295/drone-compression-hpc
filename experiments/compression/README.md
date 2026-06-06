@@ -245,6 +245,29 @@ sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
 
 The detection output folder contains `detection_summary.csv`, `detection_per_class.csv`, `detection_summary.md`, and `manifest.json`.
 
+For the N8 vehicle pilot, the evaluator supports COCO detector class mapping:
+
+```bash
+python experiments/compression/prepare_detection_image_sets.py \
+  --ground_truth_dir /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8 \
+  --image_sets original=/projects/bfod/$USER/cdc-deltaai/data/imgs \
+  --output_dir /projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/vehicle_n8 \
+  --overwrite
+
+RUN_STAMP=20260606_detection_coco_vehicle_n8 \
+DETECTION_INSTALL_ULTRALYTICS=1 \
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n8 \
+DETECTION_MODEL=/projects/bfod/$USER/cdc-deltaai/weights/detectors/yolov8x.pt \
+DETECTION_IMAGE_SETS="original=/projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/vehicle_n8/original" \
+DETECTION_CLASSES="2 5 7" \
+DETECTION_CLASS_MAP="2=0 5=0 7=0" \
+DETECTION_DROP_UNMAPPED=1 \
+DETECTION_RESTRICT_TO_GT=1 \
+sbatch experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+COCO classes `2`, `5`, and `7` are car, bus, and truck. They are mapped to the pilot `0 vehicle` class. Use this as a detector-pipeline pilot unless a project-specific detector is available.
+
 Submit the whole suite:
 
 ```bash

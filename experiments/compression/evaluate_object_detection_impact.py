@@ -50,6 +50,16 @@ def parse_label_mapping(value: str) -> tuple[str, pathlib.Path]:
     return label, pathlib.Path(path).expanduser()
 
 
+def parse_class_mapping(value: str) -> tuple[int, int]:
+    if "=" not in value:
+        raise argparse.ArgumentTypeError(f"Expected source=target class mapping, got: {value}")
+    source, target = value.split("=", 1)
+    try:
+        return int(source), int(target)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Class mapping must use integer IDs, got: {value}") from exc
+
+
 def normalize_image_id(stem: str) -> str:
     cleaned = stem
     patterns = [
@@ -105,6 +115,42 @@ def load_yolo_dir(path: pathlib.Path, is_prediction: bool) -> dict[str, list[Det
         image_id = normalize_image_id(label_file.stem)
         by_image.setdefault(image_id, []).extend(read_yolo_file(label_file, image_id, is_prediction))
     return by_image
+
+
+def remap_predictions(
+    by_image: dict[str, list[Detection]],
+    class_map: dict[int, int],
+    drop_unmapped: bool,
+) -> dict[str, list[Detection]]:
+    if not class_map and not drop_unmapped:
+        return by_image
+
+    remapped: dict[str, list[Detection]] = {}
+    for image_id, detections in by_image.items():
+        for detection in detections:
+            if detection.class_id in class_map:
+                mapped = Detection(
+                    detection.image_id,
+                    class_map[detection.class_id],
+                    detection.x1,
+                    detection.y1,
+                    detection.x2,
+                    detection.y2,
+                    detection.confidence,
+                )
+            elif drop_unmapped:
+                continue
+            else:
+                mapped = detection
+            remapped.setdefault(image_id, []).append(mapped)
+    return remapped
+
+
+def restrict_to_image_ids(
+    by_image: dict[str, list[Detection]],
+    allowed_image_ids: set[str],
+) -> dict[str, list[Detection]]:
+    return {image_id: detections for image_id, detections in by_image.items() if image_id in allowed_image_ids}
 
 
 def list_image_ids(image_dir: pathlib.Path) -> set[str]:
@@ -315,6 +361,8 @@ def run_ultralytics_predictions(
     output_dir: pathlib.Path,
     imgsz: int,
     conf: float,
+    detector_classes: list[int] | None,
+    device: str,
 ) -> list[tuple[str, pathlib.Path]]:
     try:
         from ultralytics import YOLO
@@ -327,6 +375,11 @@ def run_ultralytics_predictions(
     model = YOLO(model_path)
     prediction_dirs: list[tuple[str, pathlib.Path]] = []
     for label, image_dir in image_sets:
+        predict_kwargs: dict[str, object] = {}
+        if detector_classes:
+            predict_kwargs["classes"] = detector_classes
+        if device:
+            predict_kwargs["device"] = device
         model.predict(
             source=str(image_dir),
             project=str(output_dir / "ultralytics_runs"),
@@ -336,6 +389,7 @@ def run_ultralytics_predictions(
             save_txt=True,
             save_conf=True,
             exist_ok=True,
+            **predict_kwargs,
         )
         prediction_dirs.append((label, output_dir / "ultralytics_runs" / label / "labels"))
     return prediction_dirs
@@ -386,6 +440,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--imgsz", type=int, default=1280)
     parser.add_argument("--conf", type=float, default=0.001)
     parser.add_argument(
+        "--detector_classes",
+        nargs="*",
+        type=int,
+        default=[],
+        help="Optional detector class IDs to pass to Ultralytics, e.g. COCO vehicle IDs 2 5 7.",
+    )
+    parser.add_argument("--device", default="", help="Optional Ultralytics device, e.g. 0 or cpu")
+    parser.add_argument(
+        "--prediction_class_map",
+        nargs="*",
+        type=parse_class_mapping,
+        default=[],
+        metavar="SOURCE=TARGET",
+        help="Map prediction class IDs before evaluation, e.g. 2=0 5=0 7=0 for COCO vehicles.",
+    )
+    parser.add_argument(
+        "--drop_unmapped_prediction_classes",
+        action="store_true",
+        help="Drop prediction classes not listed in --prediction_class_map.",
+    )
+    parser.add_argument(
+        "--restrict_predictions_to_gt",
+        action="store_true",
+        help="Ignore predictions for image IDs that are not present in the ground-truth label folder.",
+    )
+    parser.add_argument(
         "--iou_thresholds",
         nargs="*",
         type=float,
@@ -411,7 +491,15 @@ def main() -> None:
         if not args.image_sets:
             raise ValueError("--image_sets is required when --detector_model is used")
         prediction_dirs.extend(
-            run_ultralytics_predictions(args.detector_model, args.image_sets, output_dir, args.imgsz, args.conf)
+            run_ultralytics_predictions(
+                args.detector_model,
+                args.image_sets,
+                output_dir,
+                args.imgsz,
+                args.conf,
+                args.detector_classes or None,
+                args.device,
+            )
         )
     if not prediction_dirs:
         raise ValueError("Provide --prediction_dirs or --detector_model with --image_sets")
@@ -421,10 +509,24 @@ def main() -> None:
     manifest = {
         "ground_truth_dir": str(gt_dir),
         "iou_thresholds": args.iou_thresholds,
+        "detector_model": args.detector_model,
+        "detector_classes": args.detector_classes,
+        "prediction_class_map": {str(source): target for source, target in args.prediction_class_map},
+        "drop_unmapped_prediction_classes": args.drop_unmapped_prediction_classes,
+        "restrict_predictions_to_gt": args.restrict_predictions_to_gt,
         "prediction_dirs": {},
     }
+    prediction_class_map = dict(args.prediction_class_map)
+    gt_image_ids = set(gt_by_image)
     for label, pred_dir in prediction_dirs:
         pred_by_image = load_yolo_dir(pred_dir.expanduser(), is_prediction=True)
+        pred_by_image = remap_predictions(
+            pred_by_image,
+            prediction_class_map,
+            args.drop_unmapped_prediction_classes,
+        )
+        if args.restrict_predictions_to_gt:
+            pred_by_image = restrict_to_image_ids(pred_by_image, gt_image_ids)
         summary, per_class = evaluate_config(label, gt_by_image, pred_by_image, args.iou_thresholds)
         summary["prediction_dir"] = str(pred_dir)
         summary_rows.append(summary)

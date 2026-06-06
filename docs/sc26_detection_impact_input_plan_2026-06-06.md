@@ -39,6 +39,17 @@ find /projects/bfod/yyang48 -maxdepth 7 -type f \
 
 Result: no matching detector model was found.
 
+Repeat this broader search after new files are staged on DeltaAI:
+
+```bash
+find /projects/bfod/yyang48 -maxdepth 8 -type f \
+  \( -iname "*.pt" -o -iname "*.engine" -o -iname "*.onnx" \) \
+  | grep -Ei "yolo|detect|detector|best|vehicle|damage|debris" || true
+
+find /projects/bfod/yyang48/cdc-deltaai/output -maxdepth 8 -type d \
+  \( -iname "labels" -o -iname "*predict*" -o -iname "*detect*" \) -print
+```
+
 ## Local Image Dataset Audit
 
 The local image dataset is available on Yifan's Mac at:
@@ -176,7 +187,7 @@ sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86
   experiments/compression/slurm/08_object_detection_impact.sbatch
 ```
 
-### Option B: Detector Model plus Image Sets
+### Option B: Custom Detector Model plus Image Sets
 
 Use this if predictions need to be generated inside the SLURM job.
 
@@ -207,12 +218,95 @@ sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86
   experiments/compression/slurm/08_object_detection_impact.sbatch
 ```
 
+### Option C: COCO Vehicle Detector Pilot
+
+Use this if no project-specific detector exists yet. It is a pilot detector, not a disaster-damage detector. The purpose is to measure whether compression changes a fixed detector's vehicle predictions.
+
+The pilot maps COCO detector classes to the N8 label class:
+
+| COCO class | Meaning | Pilot class |
+|------------|---------|-------------|
+| `2` | car | `0 vehicle` |
+| `5` | bus | `0 vehicle` |
+| `7` | truck | `0 vehicle` |
+
+The current pilot labels intentionally exclude motorcycles, so COCO class `3` is not included unless the label policy changes.
+
+Install Ultralytics and stage a stable COCO-pretrained detector:
+
+```bash
+cd /projects/bfod/yyang48/cdc-deltaai
+mkdir -p weights/detectors
+module load python/miniforge3_pytorch/2.10.0
+conda activate base
+python -m pip install --user ultralytics --quiet
+
+cd /projects/bfod/yyang48/cdc-deltaai/weights/detectors
+python - <<'PY'
+from ultralytics import YOLO
+YOLO("yolov8x.pt")
+PY
+
+ls -lh /projects/bfod/yyang48/cdc-deltaai/weights/detectors/yolov8x.pt
+```
+
+Prepare image sets that contain only the images with pilot labels:
+
+```bash
+cd /projects/bfod/yyang48/cdc-deltaai/code_main_641d86c
+
+python experiments/compression/prepare_detection_image_sets.py \
+  --ground_truth_dir /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8 \
+  --image_sets \
+    original=/projects/bfod/yyang48/cdc-deltaai/data/imgs \
+    best_quality_512=/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/high_quality_tile_512/visuals \
+    balanced_256=/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/balanced_tile_256/visuals \
+    balanced_512=/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/balanced_tile_512/visuals \
+    max_compression_256=/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/high_compression_tile_256/visuals \
+  --output_dir /projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff \
+  --overwrite
+```
+
+If any reconstructed `visuals` directory is missing, list the available directories first:
+
+```bash
+find /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff \
+  -maxdepth 3 -type d -name visuals -print
+```
+
+Run the detector pilot:
+
+```bash
+RUN_STAMP=20260606_detection_coco_vehicle_n8 \
+DETECTION_INSTALL_ULTRALYTICS=1 \
+DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8 \
+DETECTION_MODEL=/projects/bfod/yyang48/cdc-deltaai/weights/detectors/yolov8x.pt \
+DETECTION_IMAGE_SETS="original=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff/original best_quality_512=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff/best_quality_512 balanced_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff/balanced_256 balanced_512=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff/balanced_512 max_compression_256=/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff/max_compression_256" \
+DETECTION_CLASSES="2 5 7" \
+DETECTION_CLASS_MAP="2=0 5=0 7=0" \
+DETECTION_DROP_UNMAPPED=1 \
+DETECTION_RESTRICT_TO_GT=1 \
+DETECTION_IMGSZ=1280 \
+DETECTION_CONF=0.001 \
+sbatch --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
+  experiments/compression/slurm/08_object_detection_impact.sbatch
+```
+
+Expected outputs:
+
+```text
+/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/detection_summary.csv
+/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/detection_per_class.csv
+/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/detection_summary.md
+/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/manifest.json
+```
+
 ## Immediate Next Task
 
 For the pilot, the remaining requirements are:
 
 1. Review the `N8` draft vehicle labels and correct any missed or over-broad boxes.
-2. Provide a detector checkpoint, such as an Ultralytics-compatible `best.pt`, or provide existing YOLO prediction folders.
+2. Prefer a project-specific detector checkpoint, such as an Ultralytics-compatible `best.pt`, or existing YOLO prediction folders. If those do not exist, run the COCO vehicle detector pilot above.
 3. Confirm which configurations should be evaluated:
    - original
    - balanced `checkpoint_b00064` plus `256 x 256`
