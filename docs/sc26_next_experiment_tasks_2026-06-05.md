@@ -1,19 +1,27 @@
 # SC26 Next Experiment Tasks, 2026-06-05
 
-This page records the current SC26 CDC experiment work that still needs action after the `N_IMAGES=8` compression x tile-size smoke run.
+This page records the current SC26 CDC experiment work after the `N_IMAGES=8` smoke run and formal `N_IMAGES=50` LPIPS validation.
 
 ## Current Source of Truth
 
-- Local and GitHub repository commit after the smoke-result package: `0c58272`
-- DeltaAI code checkout for the active run: `/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c`
+- GitHub commit after the smoke-result package: `0c58272`
+- GitHub commit that added this task checklist: `ab95276`
+- DeltaAI code checkout used for the tradeoff runs: `/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c`
 - Smoke result package in GitHub: `results/2026-06-05-tradeoff-smoke/`
+- Formal N50 LPIPS result package in GitHub: `results/2026-06-05-tradeoff-n50-lpips/`
 - Full raw smoke output on DeltaAI:
 
 ```text
 /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_smoke/07_compression_tile_tradeoff/
 ```
 
-## Completed Today
+Full raw N50 LPIPS output on DeltaAI:
+
+```text
+/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/
+```
+
+## Completed Tradeoff Runs
 
 - Ran `07_compression_tile_tradeoff.sbatch` as a smoke test.
 - SLURM job: `2422067`
@@ -23,9 +31,16 @@ This page records the current SC26 CDC experiment work that still needs action a
 - Matrix: high-quality, balanced, and high-compression checkpoints crossed with no tiling, `256 x 256`, and `512 x 512`.
 - GitHub record: committed as `0c58272` with lightweight CSV and Markdown summaries.
 
-## Active Run to Monitor
+- Ran the formal `N_IMAGES=50` LPIPS tradeoff matrix.
+- SLURM job: `2422336`
+- Run stamp: `20260605_tradeoff_n50_lpips`
+- Status: completed in `13:15:48`
+- MaxRSS: `23838464K`
+- Result rows: 9
+- Matrix: same three checkpoint roles crossed with no tiling, `256 x 256`, and `512 x 512`.
+- GitHub record: packaged under `results/2026-06-05-tradeoff-n50-lpips/`.
 
-The formal `N_IMAGES=50` tradeoff run with LPIPS was submitted after the smoke test.
+## Formal N50 Command
 
 ```bash
 RUN_STAMP=20260605_tradeoff_n50_lpips \
@@ -39,46 +54,27 @@ sbatch --mem=96G --time=18:00:00 --export=ALL,REPO_DIR=/projects/bfod/yyang48/cd
   experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
 ```
 
-- SLURM job: `2422336`
-- Run stamp: `20260605_tradeoff_n50_lpips`
-- Purpose: produce the main poster/manuscript table for compression setting x tile size.
-- Expected output:
+The output is:
 
 ```text
 /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/
 ```
 
-Monitor it with:
-
-```bash
-squeue -j 2422336
-tail -f experiments/compression/slurm/logs/tradeoff_2422336.log
-sacct -j 2422336 --format=JobID,JobName,State,Elapsed,MaxRSS,AllocTRES%40
-```
-
-Read the final table with:
-
-```bash
-cat /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/combined_summary.md
-```
-
-## What to Do When Job 2422336 Finishes
-
-1. Confirm the job completed.
+The completion check was:
 
 ```bash
 sacct -j 2422336 --format=JobID,JobName,State,Elapsed,MaxRSS,AllocTRES%40
 ```
 
-2. Inspect the Markdown table and check that it has 9 rows.
+The final table can be read on DeltaAI with:
 
 ```bash
 cat /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/combined_summary.md
 ```
 
-3. Copy only lightweight outputs into GitHub.
+## GitHub Packaging Status
 
-Target package:
+The N50 LPIPS run is packaged as:
 
 ```text
 results/2026-06-05-tradeoff-n50-lpips/
@@ -88,27 +84,19 @@ results/2026-06-05-tradeoff-n50-lpips/
     └── combined_summary.md
 ```
 
-Do not commit raw full-resolution reconstructions, SLURM logs, checkpoints, raw drone images, or full `visuals/` folders.
+The package intentionally excludes raw full-resolution reconstructions, SLURM logs, checkpoints, raw drone images, and full `visuals/` folders.
 
-4. Update the result index.
+The result index entries updated for this run are:
 
 - `README.md`
 - `results/README.md`
 
-5. Push the package to GitHub.
-
-Use a commit message like:
-
-```text
-Add SC26 N50 LPIPS tradeoff results
-```
-
 ## How to Interpret the N=50 Result
 
-Use the N=50 table to decide whether the poster recommendation should be:
+The N50 table supports these working interpretations:
 
-- `balanced_checkpoint_b00064` plus `256 x 256` tiling, if the speed and memory gains hold and LPIPS/seam metrics remain acceptable.
-- `balanced_checkpoint_b00064` plus `512 x 512` tiling, if `512 x 512` gives meaningfully better SSIM, LPIPS, or visible quality for a modest runtime cost.
+- `balanced_checkpoint_b00064` plus `256 x 256` tiling is the speed-memory recommendation: `79.34` seconds per image, about `1.6 GB` peak GPU memory, `79.98x` compression, PSNR `33.14`, SSIM `0.8768`, and LPIPS `0.001826`.
+- `balanced_checkpoint_b00064` plus `512 x 512` tiling is the quality-safe backup: `86.00` seconds per image, about `3.0 GB` peak GPU memory, `78.48x` compression, PSNR `33.23`, SSIM `0.8782`, and LPIPS `0.001792`.
 - `high_quality_checkpoint_b00512` plus `512 x 512` or no tiling, only if the downstream task needs the highest fidelity more than compression ratio or runtime.
 - `high_compression_checkpoint_b00128`, only if detection and visual QA show that the quality loss is acceptable.
 
