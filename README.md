@@ -31,7 +31,7 @@ This repository is now organized around the SC26 CDC experiment design:
 |-------|----------|---------------|----------------|
 | Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
 | Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
-| Yifan | Object-detection impact | How much compression can be applied before downstream detection degrades? | Experiment 4 is not complete. A draft N8 vehicle-label pilot is tracked and the DeltaAI label/evaluator self-test passed, but formal mAP reporting still needs reviewed labels and a detector checkpoint or prediction folders. |
+| Yifan | Object-detection impact | How much compression can be applied before downstream detection degrades? | N8 vehicle detector pilot completed with COCO YOLOv8x. Formal mAP reporting still needs reviewed labels and preferably a project-specific detector. |
 | Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
 
 Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
@@ -217,6 +217,17 @@ DETECTION_DROP_UNMAPPED=1
 DETECTION_RESTRICT_TO_GT=1
 ```
 
+COCO vehicle pilot result:
+
+| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 |
+|---------------|---------|--------------|----------------|------------|--------|
+| `original` | `0.1933` | `0.0457` | `0.0698` | `0.4444` | `0.1207` |
+| `balanced_256` | `0.2142` | `0.0516` | `0.0749` | `0.4615` | `0.1290` |
+| `balanced_512` | `0.2129` | `0.0523` | `0.0709` | `0.4530` | `0.1226` |
+| `max_compression_256` | `0.1590` | `0.0381` | `0.0693` | `0.4145` | `0.1187` |
+
+This result shows that the detection-impact pipeline runs end to end. Because the COCO detector over-predicts relative to the draft labels, use it as a pilot sensitivity check rather than a formal detection-performance claim.
+
 Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
 
 ## Results Index
@@ -261,6 +272,7 @@ Important files:
 | `results/2026-06-05-tradeoff-smoke/tables/combined_summary.csv` | `N_IMAGES=8` compression-setting x tile-size smoke matrix |
 | `results/2026-06-05-tradeoff-n50-lpips/tables/combined_summary.csv` | Formal `N_IMAGES=50` compression-setting x tile-size matrix with LPIPS |
 | `results/2026-06-06-detection-label-selftest/tables/detection_summary.csv` | DeltaAI self-test confirming the N8 draft vehicle labels and detection evaluator run end to end |
+| `results/2026-06-06-detection-coco-vehicle-n8/tables/detection_summary.csv` | COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
 | `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
 | `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
 | `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |

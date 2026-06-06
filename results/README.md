@@ -18,6 +18,7 @@ Large raw outputs, full-resolution reconstructed PNGs, logs, model weights, and 
 | `2026-06-05-tradeoff-smoke/` | 2026-06-05 tradeoff smoke | Yifan | DeltaAI GH200 `N_IMAGES=8` compression-setting x tile-size matrix for high-quality, balanced, and high-compression checkpoints |
 | `2026-06-05-tradeoff-n50-lpips/` | 2026-06-05 formal tradeoff validation | Yifan | DeltaAI GH200 `N_IMAGES=50` compression-setting x tile-size matrix with LPIPS for poster/manuscript tradeoff selection |
 | `2026-06-06-detection-label-selftest/` | 2026-06-06 detection pipeline sanity check | Yifan | DeltaAI GH200 self-test confirming the N8 draft YOLO labels and detection evaluator run end to end |
+| `2026-06-06-detection-coco-vehicle-n8/` | 2026-06-06 detection pilot | Yifan | DeltaAI GH200 COCO YOLOv8x vehicle-detection pilot comparing original, balanced, and maximum-compression reconstructions |
 
 ## Hardware Scope
 

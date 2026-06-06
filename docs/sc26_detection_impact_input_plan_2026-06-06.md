@@ -9,8 +9,9 @@ The formal compression x tile-size tradeoff runs are complete and packaged:
 - Smoke run: `results/2026-06-05-tradeoff-smoke/`
 - Formal N50 LPIPS run: `results/2026-06-05-tradeoff-n50-lpips/`
 - Detection label self-test: `results/2026-06-06-detection-label-selftest/`
+- COCO vehicle detector pilot: `results/2026-06-06-detection-coco-vehicle-n8/`
 
-The next planned formal experiment is object-detection impact, using `experiments/compression/slurm/08_object_detection_impact.sbatch`. The wrapper and evaluator are working, but the formal job cannot run yet because reviewed detection labels and a detector checkpoint or prediction folders are still missing.
+The object-detection impact pipeline now runs end to end for the N8 vehicle pilot. The formal paper-grade experiment still needs reviewed labels and preferably a project-specific detector.
 
 ## DeltaAI Input Audit
 
@@ -301,12 +302,23 @@ Expected outputs:
 /projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/manifest.json
 ```
 
+Pilot result, job `2425670`:
+
+| configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 | GT boxes | Prediction boxes |
+|---------------|---------|--------------|----------------|------------|--------|----------|------------------|
+| `original` | `0.193320` | `0.045668` | `0.069799` | `0.444444` | `0.120650` | `234` | `1490` |
+| `balanced_256` | `0.214162` | `0.051601` | `0.074948` | `0.461538` | `0.128955` | `234` | `1441` |
+| `balanced_512` | `0.212877` | `0.052333` | `0.070903` | `0.452991` | `0.122614` | `234` | `1495` |
+| `max_compression_256` | `0.159048` | `0.038141` | `0.069286` | `0.414530` | `0.118727` | `234` | `1400` |
+
+Interpretation: the detector-pilot workflow succeeds. The balanced reconstructions are close to the original baseline in this pilot, while maximum compression is lower on mAP and recall. Precision is low because the COCO detector produces many more boxes than the N8 draft labels, so do not report this as a formal downstream accuracy result.
+
 ## Immediate Next Task
 
 For the pilot, the remaining requirements are:
 
 1. Review the `N8` draft vehicle labels and correct any missed or over-broad boxes.
-2. Prefer a project-specific detector checkpoint, such as an Ultralytics-compatible `best.pt`, or existing YOLO prediction folders. If those do not exist, run the COCO vehicle detector pilot above.
+2. Prefer a project-specific detector checkpoint, such as an Ultralytics-compatible `best.pt`, or existing YOLO prediction folders. The COCO vehicle detector pilot is now complete and can be used as a workflow proof.
 3. Confirm which configurations should be evaluated:
    - original
    - balanced `checkpoint_b00064` plus `256 x 256`
