@@ -57,6 +57,8 @@ Recommended configurations:
 4. For each object prompt, compare the reconstructed-image mask with the original-image mask.
 5. Aggregate per-object metrics into per-configuration summaries.
 
+Implementation note: CDC reconstructed images can be cropped to a `64`-pixel multiple, for example `5472 x 3648` originals can become `5440 x 3648` reconstructions. The evaluator runs SAM prompts in each image's own coordinate system, then resizes candidate masks to the original baseline mask size before computing stability metrics.
+
 Suggested metrics:
 
 | Metric | Meaning |

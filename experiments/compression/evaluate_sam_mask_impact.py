@@ -162,6 +162,16 @@ def load_rgb(path: pathlib.Path) -> np.ndarray:
     return np.asarray(Image.open(path).convert("RGB"))
 
 
+def resize_mask_to_shape(mask: np.ndarray, target_shape: tuple[int, int]) -> np.ndarray:
+    if mask.shape == target_shape:
+        return mask
+    target_height, target_width = target_shape
+    resampling = getattr(Image, "Resampling", Image).NEAREST
+    image = Image.fromarray(mask.astype(np.uint8) * 255)
+    resized = image.resize((target_width, target_height), resampling)
+    return np.asarray(resized) > 0
+
+
 def pixel_boxes(prompts: list[PromptBox], width: int, height: int, box_expansion: float) -> np.ndarray:
     boxes = []
     for prompt in prompts:
@@ -504,8 +514,11 @@ def main() -> None:
                 continue
             if label == args.baseline_config:
                 candidate_masks = baseline_masks
+                candidate_height, candidate_width = height, width
+                resized_candidate_masks = False
             else:
                 candidate_image = load_rgb(image_path)
+                candidate_height, candidate_width = candidate_image.shape[:2]
                 candidate_masks = predict_masks_for_image(
                     predictor,
                     candidate_image,
@@ -515,11 +528,15 @@ def main() -> None:
                     args.multimask_output,
                     args.box_expansion,
                 )
-                if candidate_image.shape[:2] != (height, width):
-                    raise ValueError(
-                        f"Image size mismatch for {image_id} in {label}: "
-                        f"{candidate_image.shape[:2]} vs {(height, width)}"
-                    )
+                resized_candidate_masks = candidate_image.shape[:2] != (height, width)
+                if resized_candidate_masks:
+                    candidate_masks = [
+                        MaskResult(
+                            mask=resize_mask_to_shape(mask_result.mask, (height, width)),
+                            score=mask_result.score,
+                        )
+                        for mask_result in candidate_masks
+                    ]
             evaluated_images[label].add(image_id)
             image_rows: list[dict[str, object]] = []
             for prompt, baseline_mask, candidate_mask in zip(prompts, baseline_masks, candidate_masks):
@@ -537,6 +554,11 @@ def main() -> None:
                     "class_id": prompt.class_id,
                     "image_width": width,
                     "image_height": height,
+                    "baseline_image_width": width,
+                    "baseline_image_height": height,
+                    "candidate_image_width": candidate_width,
+                    "candidate_image_height": candidate_height,
+                    "candidate_mask_resized_to_baseline": resized_candidate_masks,
                     "box_x1": prompt.x1,
                     "box_y1": prompt.y1,
                     "box_x2": prompt.x2,
