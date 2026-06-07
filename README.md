@@ -1,953 +1,273 @@
-# CDC Image Compression on DeltaAI
+# CDC Image Compression and Reconstruction on DeltaAI
 
-Lossy image compression with Conditional Diffusion Models, adapted for running on [NSF DeltaAI](https://docs.ncsa.illinois.edu/systems/deltaai/).
+This repository contains the SC26 experiment package for evaluating Conditional Diffusion Model based lossy compression and reconstruction on high-resolution drone imagery. The work adapts the CDC image-compression code path for GPU HPC systems and studies the full systems question: how much storage can be saved before reconstruction quality and downstream computer-vision behavior degrade.
+
+The core narrative handoff is the June 6 experiment-response document. This README mirrors that document and uses the poster draft as the project framing source.
 
 Based on: [Lossy Image Compression with Conditional Diffusion Models](https://arxiv.org/pdf/2209.06950.pdf)
 
-## Current Repository Map
+## Current Answer
 
-Start here if you only need the current public-facing materials:
+For the June 2 experiment-response scope, the implementation and main DeltaAI runs are complete.
+
+Recommended setting:
+
+- Use `balanced_checkpoint_b00064` with `256 x 256` tiling as the primary deployment setting.
+- Keep `balanced_checkpoint_b00064` with `512 x 512` tiling as the quality-safe backup.
+- Keep `high_compression_checkpoint_b00128` as a stress-test setting only.
+
+The detection and SAM downstream experiments are complete as pilots. The N50 vehicle labels are draft labels, so these results support sensitivity analysis and workflow validation. They should not be presented as final paper-grade detection benchmarks until the labels are manually reviewed and, ideally, a project-specific detector is available.
+
+## Poster Storyline
+
+Drone surveys can generate hundreds of gigabytes of ultra-high-resolution imagery. The poster question is whether a CDC compression and reconstruction workflow can reduce storage and transfer pressure on HPC systems while preserving enough image quality for inspection and downstream computer vision.
+
+Current poster framing:
+
+- Study area: Galveston, Texas.
+- Data: 100 RGB drone images, approximately `5472 x 3648` pixels, 24-bit color, average original size about `8.34 MB`, collected from about `47 m` altitude.
+- Baseline: native full-resolution reconstruction, fp32, 65 denoising steps, batch size 1.
+- Controlled settings: checkpoint, tile size, tile batch size, denoising steps, precision, resolution, and storage placement.
+- Metrics: wall time, peak GPU memory, BPP, compression ratio, PSNR, SSIM, LPIPS, high-percentile error, seam metrics, visual heatmaps, detection metrics, and SAM mask-stability metrics.
+- Systems scope: DeltaAI GH200 is the main experiment platform. Delta H200 is a quick hardware comparison target.
+
+## Experiment Status
+
+| Item | Question | Status | Evidence |
+| --- | --- | --- | --- |
+| Experiment 1 | Compression optimization | Complete | Checkpoint-controlled compression settings are selected. `b00064` is the main balanced setting; `b00128` is the high-compression stress test. |
+| Experiment 2 | Reconstruction optimization | Complete | 256 and 512 tiling were validated. 256 tiles are fastest and lowest memory; 512 tiles are the quality backup. |
+| Experiment 3 | Compression x tile-size tradeoff | Complete | The N50 LPIPS matrix finished all 9 rows on DeltaAI GH200 under Slurm job `2422336`. |
+| Experiment 4 | Object-detection impact | Complete as pilot | The N50 COCO YOLOv8x vehicle workflow finished under Slurm job `2426722`; labels remain draft. |
+| Add-on | SAM zero-shot mask stability | Complete as pilot | Meta SAM ViT-H finished on 50 images and 829 prompts under Slurm job `2426827`; failed prompt rate was 0. |
+| Add-on | GH200 vs H200 comparison | Complete | H200 is runnable and is about 3.6% faster than the prior GH200 fp32 sweep at matched step counts. |
+
+## Final Recommendation
+
+| Configuration | Setting | Sec/img | Peak GPU | Compression | PSNR | SSIM | LPIPS | Interpretation |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| High quality 512 | `b00512 + 512 tile` | 88.51 | 2.96 GB | 29.73x | 34.19 | 0.9376 | 0.002591 | Quality reference for tiled reconstruction. |
+| Balanced 256 | `b00064 + 256 tile` | 79.34 | 1.57 GB | 79.98x | 33.14 | 0.8768 | 0.001826 | Recommended speed and memory setting. |
+| Balanced 512 | `b00064 + 512 tile` | 86.00 | 2.90 GB | 78.48x | 33.23 | 0.8782 | 0.001792 | Quality-safe backup. |
+| Max compression 256 | `b00128 + 256 tile` | 78.91 | 1.57 GB | 139.89x | 30.89 | 0.8193 | 0.005676 | Stress-test setting only. |
+
+Source: `results/2026-06-05-tradeoff-n50-lpips/`.
+
+System readout: 256 tiling reduces peak GPU memory from roughly 52 GB in full-image mode to roughly 1.6 GB while cutting runtime from about 143 seconds per image to about 79 seconds per image. The 512 setting is slower and uses more memory, but it is slightly safer on image-quality metrics.
+
+## Compression Settings
+
+The current x-param CDC path does not expose a continuous runtime compression-ratio knob. Compression is controlled by checkpoint choice and reported using measured BPP and compression ratio.
+
+| Role | Checkpoint | Sec/img | Peak GPU | BPP | Compression | PSNR | SSIM | Use |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| High quality | `b00512` | 143.73 | 50.8 GB | 0.7345 | 32.67x | 34.84 | 0.9423 | Highest fidelity reference. |
+| Balanced | `b00064` | 143.66 | 50.7 GB | 0.2578 | 93.11x | 33.73 | 0.8803 | Main compression setting. |
+| High compression | `b00128` | 143.70 | 50.7 GB | 0.1448 | 165.73x | 31.52 | 0.8281 | Maximum-compression stress test. |
+| Baseline | `b02048` | 143.70 | 50.8 GB | 0.3371 | 71.20x | 29.45 | 0.8727 | Earlier reference setting. |
+
+Source: `results/2026-05-22-jacob-compression-n20/`.
+
+## Downstream Impact
+
+### Object Detection
+
+Experiment 4 runs a fixed detector on original and reconstructed image sets, then compares predictions against the same YOLO-format vehicle labels.
+
+N50 pilot setup:
+
+- Detector: COCO-pretrained Ultralytics YOLOv8x.
+- Class mapping: COCO `car`, `bus`, and `truck` mapped to one pilot class, `0 vehicle`.
+- Ground truth: 50 draft-labeled images, 829 vehicle boxes.
+- Caveat: the first 8 images use manual draft labels; images 9 to 50 use auto-assisted COCO YOLOv8x vehicle candidates at confidence `0.40`.
+
+| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 | GT boxes | Predictions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original | 0.6902 | 0.5711 | 0.0635 | 0.8432 | 0.1182 | 829 | 11002 |
+| High quality 512 | 0.6329 | 0.2706 | 0.0625 | 0.8094 | 0.1160 | 829 | 10742 |
+| Balanced 256 | 0.6280 | 0.2712 | 0.0601 | 0.8070 | 0.1118 | 829 | 11137 |
+| Balanced 512 | 0.6225 | 0.2703 | 0.0592 | 0.8070 | 0.1102 | 829 | 11310 |
+| Max compression 256 | 0.5889 | 0.2603 | 0.0568 | 0.7720 | 0.1059 | 829 | 11260 |
+
+Source: `results/2026-06-06-detection-coco-vehicle-n50/`.
+
+Interpretation: balanced reconstructions remain closer to the original baseline than maximum compression. Precision is low because `DETECTION_CONF=0.001` intentionally keeps many low-confidence predictions for AP and recall analysis.
+
+### SAM Zero-Shot Mask Stability
+
+The SAM add-on uses the same N50 vehicle boxes as prompts and compares the reconstructed-image mask with the original-image mask for the same image and prompt. This is not class-aware detection accuracy. It is a zero-shot segmentation boundary-stability check.
+
+| Configuration | Images | Prompts | Mean mask IoU | Mean Dice | Area ratio | Abs. area change | Centroid shift | Failed prompt rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Original | 50 | 829 | 1.0000 | 1.0000 | 1.0000 | 0.0000 | 0.00 px | 0.0000 |
+| Balanced 256 | 50 | 829 | 0.7056 | 0.8110 | 1.0193 | 0.0754 | 16.76 px | 0.0000 |
+| Balanced 512 | 50 | 829 | 0.7061 | 0.8116 | 1.0133 | 0.0698 | 16.81 px | 0.0000 |
+| Max compression 256 | 50 | 829 | 0.7048 | 0.8107 | 1.0229 | 0.0785 | 16.67 px | 0.0000 |
+
+Source: `results/2026-06-06-sam-mask-impact-n50/`.
+
+Interpretation: all prompts returned usable masks. Balanced 512 is slightly best on mask IoU, Dice, and area stability; Balanced 256 is nearly tied and remains the speed-memory recommendation.
+
+## Hardware Comparison
+
+| Steps | GH200 sec/img | H200 sec/img | H200 speedup | Note |
+| ---: | ---: | ---: | ---: | --- |
+| 5 | 11.27 | 10.87 | 3.6% | Same fp32 reconstruction comparison. |
+| 20 | 44.37 | 42.74 | 3.7% | Same fp32 reconstruction comparison. |
+| 65 | 143.67 | 138.48 | 3.6% | Same fp32 reconstruction comparison. |
+
+Source: `results/2026-04-28-h200-reconstruction/`.
+
+The H200 comparison confirms that the workflow runs on H200. The speed difference is modest, so the main experiment selection should be based on checkpoint and tile behavior before broad H200 reruns.
+
+## Repository Map
 
 | Path | Use |
-|------|-----|
-| `paper/submission/` | SC26 Research Posters package: poster draft, IEEE-format summary, planned updates, and optional artifact appendix |
-| `paper/` | Longer paper-style LaTeX draft and compiled PDF |
-| `results/` | Lightweight, GitHub-safe result tables and downsampled visual examples |
-| `experiments/compression/` | DeltaAI experiment runners, SLURM scripts, summarizers, and poster-panel helpers |
-| `docs/` | Dated runbooks and progress notes that explain how each result package was produced |
-| `data/detection_pilot/` | GitHub-safe pilot labels for the pending object-detection impact experiment |
-| `slides/` | Editable PowerPoint decks and rebuild scripts; generated `output/` and `scratch/` files are intentionally not tracked |
-| `xparam/`, `epsilonparam/` | Model code adapted from the CDC implementation |
+| --- | --- |
+| `paper/submission/` | SC26 poster draft, IEEE-format summary draft, optional artifact appendix, and poster figures. |
+| `paper/` | Longer paper-style LaTeX draft and compiled PDF. |
+| `results/` | GitHub-safe result summaries, CSVs, Markdown tables, and small visual examples. |
+| `experiments/compression/` | DeltaAI experiment runners, SLURM scripts, detection evaluator, SAM evaluator, summarizers, and poster-panel helpers. |
+| `docs/` | Dated runbooks, experiment plans, and progress notes. |
+| `data/detection_pilot/` | Draft YOLO vehicle labels for N8 and N50 detection-pipeline validation. |
+| `slides/` | Editable progress decks and rebuild scripts from earlier SC26 update cycles. |
+| `xparam/`, `epsilonparam/` | Model code adapted from the CDC implementation. |
 
-Raw drone images, checkpoints, full DeltaAI output folders, logs, generated slide previews, and local cache files are intentionally excluded from the repository. Small pilot labels and result summaries are tracked when they are useful for reproducing the experiment workflow.
+## Result Archive
 
-## SC26 Experiment Snapshot
+Most readers should start from these result packages:
 
-Updated: 2026-06-06
+| Folder | Purpose |
+| --- | --- |
+| `results/2026-06-05-tradeoff-n50-lpips/` | Formal N50 compression-setting x tile-size matrix with LPIPS. |
+| `results/2026-06-06-detection-coco-vehicle-n50/` | N50 COCO YOLOv8x vehicle detection pilot. |
+| `results/2026-06-06-sam-mask-impact-n50/` | N50 Meta SAM zero-shot mask-stability pilot. |
+| `results/2026-05-22-jacob-compression-n20/` | Compression-side checkpoint and storage validation. |
+| `results/2026-05-15-yifan-selected-256-512-n50/` | Earlier selected 256 vs 512 tiling validation with visual examples. |
+| `results/2026-04-28-h200-reconstruction/` | Delta H200 quick reconstruction comparison. |
+| `results/2026-04-26-reconstruction/` | Initial DeltaAI GH200 reconstruction profiling. |
 
-This repository is now organized around the SC26 CDC experiment design:
+See `results/README.md` for the full archive index.
 
-| Owner | Pipeline | Main question | Current status |
-|-------|----------|---------------|----------------|
-| Jacob | Compression / encoding | How fast can we shrink the data? | Compression evaluation workflow and DeltaAI GH200 validation results are documented below. |
-| Yifan | Reconstruction / decoding / diffusion / tiling optimization | How fast can we use the data again? | DeltaAI reconstruction profiling is complete. The 2026-06-05 N50 LPIPS tradeoff makes balanced `checkpoint_b00064` with `256 x 256` the speed and memory candidate, with `512 x 512` kept as the quality-safe backup. |
-| Yifan | Object-detection / zero-shot segmentation impact | How much compression can be applied before downstream computer-vision outputs degrade? | N50 COCO YOLOv8x vehicle detector pilot and N50 Meta SAM mask-stability pilot completed. N50 draft labels are available but still need review before formal mAP claims. |
-| Poster package | SC26 Research Posters | How do we present the result clearly? | The current poster draft, IEEE-format summary, and artifact appendix live in `paper/submission/`. |
+## Data and Privacy Boundary
 
-Use the top sections as the project index. The older detailed setup and evaluation notes are preserved below as reference rather than removed.
+This repository is intended as a private research and experiment package.
 
-## Compute Platform Baseline
+Tracked:
 
-This repository currently tracks experiments across two NCSA systems:
+- Source code, SLURM scripts, runbooks, and result summaries.
+- Small GitHub-safe visual examples and poster figures.
+- Draft N8 and N50 YOLO vehicle labels used to validate the detection pipeline.
 
-| System | Login | Confirmed GPU target | Account / allocation | Current role |
-|--------|-------|----------------------|----------------------|--------------|
-| DeltaAI | `ssh yyang48@dtai-login.delta.ncsa.illinois.edu` or `ssh yyang48@gh-login01.delta.ncsa.illinois.edu` | NVIDIA GH200 | `bfod-dtai-gh` | Completed 2026-04-26 reconstruction experiments |
-| Delta | `ssh yyang48@login.delta.ncsa.illinois.edu` or `ssh yyang48@dt-login.delta.ncsa.illinois.edu` | NVIDIA H200 visible through `gpuH200x8` and `gpuH200x8-interactive` | `bfod-delta-gpu` | Future GH200-vs-H200 comparison target |
+Not tracked:
 
-Important hardware distinction:
+- Raw drone image folders such as `100_0005/`.
+- Full-resolution reconstructed outputs.
+- DeltaAI logs and full output folders.
+- CDC checkpoints, SAM checkpoints, detector weights, and local caches.
 
-- The committed 2026-04-26 results are **DeltaAI GH200** results.
-- Delta is a separate NCSA system. On 2026-04-28, Delta showed H200 partitions under the `bfod-delta-gpu` account.
-- No H100 partition was visible in the checked Delta `sinfo` output, so H100 is not yet a confirmed comparison target.
-- The next realistic hardware comparison is **DeltaAI GH200 vs Delta H200**.
-
-Delta resource check recorded on 2026-04-28:
-
-| Item | Value |
-|------|-------|
-| Delta login host reached | `dt-login02.delta.ncsa.illinois.edu` |
-| Delta account | `bfod-delta-gpu` |
-| Delta GPU balance | `1076` of `2037` GPU hours |
-| H200 batch partition | `gpuH200x8` |
-| H200 interactive partition | `gpuH200x8-interactive` |
-| H200 nodes | `gpue[01-08]` |
-| H200 smoke-test node | `gpue08.delta.ncsa.illinois.edu` |
-| H200 GPU memory | `143771 MiB` |
-| H200 driver / CUDA | NVIDIA driver `570.148.08`, CUDA `12.8` |
-| Delta PyTorch module | `pytorch-conda/2.8` |
-| Delta PyTorch check | `2.8.0+cu128`, CUDA available, device `NVIDIA H200` |
-| CDC dependencies | `skimage`, `compressai`, `einops`, `lpips`, `ema_pytorch`, `tqdm`, `matplotlib`, `pandas` imported successfully |
-| Delta data / weights visibility | `/projects/bfod/$USER/cdc-deltaai/data/imgs` and `/projects/bfod/$USER/cdc-deltaai/weights/x_param` are visible on Delta |
-| H200 single-image sanity test | 20 steps fp32 completed on image `100_0005_0001.JPG`; inference `207.24s`, total `217.11s`, peak memory `52013.4 MB`, PSNR `30.64`, SSIM `0.8955`, BPP `0.3299` |
-| H200 batch pilot | 20 steps fp32, 2 images, 1 repeat: batch 1 = `42.55s/image`, `84.6 img/hr`, `52127.4 MB`; batch 2 = `53.14s/image`, `67.8 img/hr`, `108564.3 MB` |
-| H200 current batch decision | Use `batch_size=1` for H200 step sweep. Batch 2 fits in memory but reduces throughput in the pilot. |
-| H200 quick step sweep | Completed for steps `5, 20, 65`, fp32 + fp16, batch 1, 5 images, 3 repeats (`N=15` per config). |
-
-H200 quick step sweep summary:
-
-| Precision | Steps | Batch | Inference sec/image | Images/hour | Peak GPU memory | PSNR | SSIM | BPP |
-|-----------|-------|-------|---------------------|-------------|-----------------|------|------|-----|
-| fp32 | 5 | 1 | 10.87 | 331.2 | 52.2 GB | 31.56 | 0.9066 | 0.3300 |
-| fp32 | 20 | 1 | 42.74 | 84.2 | 52.2 GB | 30.48 | 0.8961 | 0.3300 |
-| fp32 | 65 | 1 | 138.48 | 26.0 | 52.2 GB | 29.92 | 0.8846 | 0.3300 |
-| fp16 | 5 | 1 | 10.29 | 350.1 | 34.2 GB | 31.63 | 0.9063 | invalid |
-| fp16 | 20 | 1 | 40.32 | 89.3 | 34.2 GB | 30.54 | 0.8958 | invalid |
-| fp16 | 65 | 1 | 130.64 | 27.6 | 34.2 GB | 30.02 | 0.8838 | invalid |
-
-Initial H200 interpretation: H200 is slightly faster than the prior DeltaAI GH200 sweep at the same step counts, but the difference is small. Use fp32 for BPP and compression-ratio reporting; use fp16 for speed and memory discussion only.
-
-Use this H200 smoke test before porting the full workflow to Delta:
-
-```bash
-srun --account=bfod-delta-gpu --partition=gpuH200x8-interactive \
-     --nodes=1 --ntasks=1 --gres=gpu:h200:1 --mem=32G \
-     --time=00:10:00 --pty bash
-```
-
-## Phase Timeline and Task Index
-
-| Phase | Date / cycle | Task | Main files and outputs |
-|-------|--------------|------|------------------------|
-| Phase 0 | Initial setup | Port CDC code and DeltaAI paths into this repo. | `environment.yml`, `epsilonparam/`, `xparam/`, `scripts/run_deltaai.sh` |
-| Phase 1 | GH200 compression evaluation | Run x-param compression evaluation on 100 drone images and summarize bitrate / compression ratio. | `xparam/evaluate_compression.py`, `xparam/run_evaluation.sh`, `xparam/run_b02048_resume.sh` |
-| Phase 2 | 2026-04-25 | Add reconstruction profiling workflow for Yifan's SC26 task. | `xparam/profile_reconstruction.py`, `xparam/sweep_steps.py`, `xparam/plot_results.py`, `xparam/run_profiling_sweep.sh` |
-| Phase 3 | 2026-04-26 | Run DeltaAI reconstruction experiments: single-image sanity test, batch-size pilot, repeated step sweep, fp32/fp16 comparison, and plotting. | `results/2026-04-26-reconstruction/`, `docs/progress_2026-04-25_for_2026-05-01_meeting.md` |
-| Phase 4 | Before 2026-05-01 meeting | Prepare slide-ready conclusions and align figure format with Jacob's compression results. | Reconstruction plots, summary CSVs, visual comparison image, meeting notes, `slides/2026-04-30-weekly-progress/` |
-| Phase 5 | May 2026 poster cycle | Run compression speed, storage, batching, tiling, and HPC scaling experiments. | `experiments/compression/`, `docs/sc26_compression_experiment_plan.md` |
-| Phase 5a | 2026-05-12 | Complete Yifan's DeltaAI tiling smoke test and `N_IMAGES=8` pilot for full-resolution images. | `results/2026-05-12-yifan-tiling-pilot/`, `results/2026-05-12-yifan-tiling-smoke/`, `docs/progress_2026-05-12_yifan_tiling.md` |
-| Phase 5b | 2026-05-14 | Prepare the follow-up `256 x 256` tiling run, add pixel-error metrics, and save original/reconstruction/error-heatmap panels. | `experiments/compression/run_compression_experiment.py`, `experiments/compression/slurm/03_tiling_sweep.sbatch`, `docs/progress_2026-05-14_yifan_tiling_next_steps.md` |
-| Phase 5c | 2026-05-15 to 2026-05-20 | Prepare Jacob's compression-side baseline, resolution, checkpoint, batch, scaling, and storage experiments for DeltaAI. | `experiments/compression/slurm/run_jacob_compression_suite.sh`, `docs/progress_2026-05-15_jacob_compression_prep.md` |
-| Phase 5d | 2026-05-21 to 2026-05-24 | Add poster-ready visual QA panels and finish selected `256 x 256` vs `512 x 512` validation. | `experiments/compression/make_poster_panels.py`, `experiments/compression/poster_panels.py`, `docs/progress_2026-05-21_yifan_poster_experiments.md` |
-
-## Current Reconstruction Results for Yifan
-
-The reconstruction experiments were run on NSF ACCESS DeltaAI GH200 with full-resolution drone images cropped to `5440 x 3648` pixels.
-
-Key conclusions for the 2026-05-01 meeting:
-
-- Diffusion inference is the dominant bottleneck in reconstruction.
-- The realistic full-image reconstruction batch size is `1`; `batch_size=2` caused CUDA OOM.
-- Reducing denoising steps is the strongest speed lever.
-- The 5-step setting is the fastest measured setting so far and passed the first visual check on image `100_0005_0001`.
-- fp16 reduces memory and improves speed, but fp16 BPP is invalid in the current output, so use fp32 for bitrate and compression-ratio discussion.
-
-Representative step-sweep results:
-
-| Precision | Steps | Batch | Inference sec/image | Images/hour | Peak GPU memory | PSNR | SSIM | BPP |
-|-----------|-------|-------|---------------------|-------------|-----------------|------|------|-----|
-| fp32 | 5 | 1 | 11.27 | 319.3 | 52.2 GB | 31.57 | 0.9066 | 0.3300 |
-| fp32 | 20 | 1 | 44.37 | 81.2 | 52.2 GB | 30.47 | 0.8961 | 0.3300 |
-| fp32 | 65 | 1 | 143.67 | 25.1 | 52.2 GB | 29.92 | 0.8845 | 0.3300 |
-| fp16 | 5 | 1 | 10.47 | 343.8 | 34.2 GB | 31.63 | 0.9063 | invalid |
-| fp16 | 65 | 1 | 133.68 | 26.9 | 34.2 GB | 30.03 | 0.8839 | invalid |
-
-Visual check:
-
-![Reconstruction visual comparison](results/2026-04-26-reconstruction/visual_examples_small/comparison_100_0005_0001.jpg)
-
-## Current Yifan Tiling Pilot Result
-
-The 2026-05-12 DeltaAI GH200 pilot validates the tiling path for Yifan's current weekly task. It used eight full-resolution drone images cropped to `5440 x 3648`, the `baseline_b02048` checkpoint, `65` denoising steps, and fp32 inference.
-
-| Setup | Time per image | Peak GPU memory | Compression ratio | PSNR | SSIM | Seam metric |
-|-------|----------------|-----------------|-------------------|------|------|-------------|
-| No tiling | 143.55 s | 52.0 GB | 72.74x | 29.88 | 0.8847 | n/a |
-| `512 x 512` tile | 86.01 s | 3.0 GB | 68.79x | 29.73 | 0.8822 | 0.027796 |
-| `1024 x 1024` tile | 88.35 s | 11.2 GB | 66.11x | 29.82 | 0.8835 | 0.028595 |
-| `2048 x 2048` tile | 95.39 s | 43.8 GB | 66.04x | 29.90 | 0.8841 | 0.031026 |
-
-Interpretation: `512 x 512` tiling reduced wall time by about 40 percent and peak GPU memory by about 17.2x in this pilot, while PSNR and SSIM stayed close to the no-tiling reference. Visual inspection of the saved overview and seam-region examples found no obvious grid-like stitching seams in the checked sample.
-
-The 2026-05-15 selected `N_IMAGES=50` follow-up compared no tiling, `256 x 256`, and `512 x 512`. `256 x 256` is now the best speed and memory candidate: `79.84 s/image`, `1.66 GB` peak GPU memory, `68.24x` compression ratio, PSNR `28.78`, SSIM `0.8552`, and seam metric `0.032556`. Keep `512 x 512` as the quality-safe backup because it has slightly better PSNR, SSIM, MAE, and high-percentile error.
-
-The 2026-06-05 formal N50 LPIPS tradeoff compares high-quality, balanced, and high-compression checkpoints at `256 x 256` and `512 x 512` tiling. The current deployment recommendation is balanced `checkpoint_b00064` with `256 x 256` tiles: `79.34 s/image`, about `1.6 GB` peak GPU memory, `79.98x` compression, PSNR `33.14`, SSIM `0.8768`, and LPIPS `0.001826`. Balanced `checkpoint_b00064` with `512 x 512` tiles remains the quality-safe backup: `86.00 s/image`, about `3.0 GB` peak GPU memory, `78.48x` compression, PSNR `33.23`, SSIM `0.8782`, and LPIPS `0.001792`.
-
-## Current Object-Detection Impact Status
-
-Experiment 4 is the downstream computer-vision test:
+The expected DeltaAI storage root is:
 
 ```text
-Original image -> compression -> reconstruction -> fixed object detector -> mAP / precision / recall / F1
+/projects/bfod/$USER/cdc-deltaai/
 ```
 
-The formal experiment is still pending because the DeltaAI audit did not find reviewed YOLO ground-truth labels or a detector checkpoint. To unblock pipeline testing, the repository now includes a small draft vehicle-detection pilot:
+The default experiment output root is:
 
 ```text
-data/detection_pilot/labels_yolo_vehicle_n8/
+/projects/bfod/$USER/cdc-deltaai/output/sc26_compression/$RUN_STAMP/
 ```
 
-Pilot contents:
+## Run the Current Workflows on DeltaAI
 
-| Item | Value |
-|------|-------|
-| Images | `100_0005_0001.JPG` through `100_0005_0008.JPG` |
-| Class | `0 vehicle` |
-| Draft boxes | `234` |
-| Source image size | `5472 x 3648` |
-| Status | Pipeline validation only; DeltaAI self-test passed; review required before formal mAP reporting |
-
-An expanded auto-assisted draft is also available:
-
-| Item | Value |
-|------|-------|
-| Path | `data/detection_pilot/labels_yolo_vehicle_n50_draft/` |
-| Images | `100_0005_0001.JPG` through `100_0005_0050.JPG` |
-| Draft boxes | `829` |
-| Source | first 8 manual draft labels plus YOLOv8x COCO vehicle candidates for images 9-50 |
-| Auto threshold | `0.40`, selected by an N8 calibration sweep |
-| Status | Review required before formal mAP reporting |
-
-DeltaAI label/evaluator self-test:
-
-| Item | Value |
-|------|-------|
-| Job ID | `2425654` |
-| Run stamp | `20260606_detection_label_selftest` |
-| Result | `self` mAP@0.5 = `1.0`, mAP@0.5:0.95 = `1.0`, precision = `1.0`, recall = `1.0`, F1 = `1.0` |
-| Result package | `results/2026-06-06-detection-label-selftest/` |
-
-Stage the pilot labels on DeltaAI after pulling the latest `main`:
+Use a clean checkout on DeltaAI. If an old checkout has diverged, clone a fresh `code_main_<sha>` tree rather than trying to repair the old working copy mid-run.
 
 ```bash
-cd /projects/bfod/yyang48/cdc-deltaai/code_main_641d86c
-git pull --ff-only origin main
-
-mkdir -p /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
-rsync -av data/detection_pilot/labels_yolo_vehicle_n8/labels/ \
-  /projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8/
-```
-
-Then use this ground-truth path:
-
-```bash
-DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
-```
-
-The detection job still needs one of these inputs:
-
-- `DETECTION_MODEL=/path/to/best.pt` plus image folders for original and reconstructed outputs.
-- `DETECTION_PREDICTION_DIRS="original=/path/to/original/labels balanced=/path/to/balanced/labels ..."` if prediction labels have already been generated.
-
-If no project-specific detector exists, the evaluator now supports a COCO vehicle detector pilot using an Ultralytics model with `car`, `bus`, and `truck` predictions mapped to `0 vehicle`:
-
-```text
-DETECTION_CLASSES="2 5 7"
-DETECTION_CLASS_MAP="2=0 5=0 7=0"
-DETECTION_DROP_UNMAPPED=1
-DETECTION_RESTRICT_TO_GT=1
-```
-
-COCO vehicle pilot result:
-
-| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 |
-|---------------|---------|--------------|----------------|------------|--------|
-| `original` | `0.1933` | `0.0457` | `0.0698` | `0.4444` | `0.1207` |
-| `balanced_256` | `0.2142` | `0.0516` | `0.0749` | `0.4615` | `0.1290` |
-| `balanced_512` | `0.2129` | `0.0523` | `0.0709` | `0.4530` | `0.1226` |
-| `max_compression_256` | `0.1590` | `0.0381` | `0.0693` | `0.4145` | `0.1187` |
-
-This result shows that the detection-impact pipeline runs end to end. Because the COCO detector over-predicts relative to the draft labels, use it as a pilot sensitivity check rather than a formal detection-performance claim.
-
-N50 COCO vehicle pilot result:
-
-| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision@0.5 | Recall@0.5 | F1@0.5 |
-|---------------|---------|--------------|----------------|------------|--------|
-| `original` | `0.6902` | `0.5711` | `0.0635` | `0.8432` | `0.1182` |
-| `high_quality_512` | `0.6329` | `0.2706` | `0.0625` | `0.8094` | `0.1160` |
-| `balanced_256` | `0.6280` | `0.2712` | `0.0601` | `0.8070` | `0.1118` |
-| `balanced_512` | `0.6225` | `0.2703` | `0.0592` | `0.8070` | `0.1102` |
-| `max_compression_256` | `0.5889` | `0.2603` | `0.0568` | `0.7720` | `0.1059` |
-
-The N50 pilot shows the same broad pattern at a larger scale: balanced reconstructions remain closer to the original baseline than the maximum-compression stress test. The labels are draft and partly auto-assisted, so treat this as a sensitivity result until labels are reviewed.
-
-Complementary SAM idea:
-
-```text
-Original image -> compression -> reconstruction -> same SAM prompts -> mask IoU / Dice / area change / centroid shift
-```
-
-Meta SAM can be used as a zero-shot segmentation stability test. The recommended setup is to use the same N50 prompt boxes on the original and reconstructed images, then compare whether SAM masks change across `balanced_256`, `balanced_512`, and maximum-compression reconstructions. This does not replace detector mAP because SAM is not class-aware; it adds a shape and boundary stability signal.
-
-N50 SAM mask-stability result:
-
-| Configuration | Mean mask IoU | Mean Dice | Mean area ratio | Failed prompt rate |
-|---------------|---------------|-----------|-----------------|--------------------|
-| `original` | `1.0000` | `1.0000` | `1.0000` | `0.0000` |
-| `balanced_256` | `0.7056` | `0.8110` | `1.0193` | `0.0000` |
-| `balanced_512` | `0.7061` | `0.8116` | `1.0133` | `0.0000` |
-| `max_compression_256` | `0.7048` | `0.8107` | `1.0229` | `0.0000` |
-
-The SAM pilot shows that all prompts returned usable masks. Balanced and maximum-compression reconstructions are close on mask IoU and Dice, with `balanced_512` slightly best on this metric set.
-
-Runbook details are in `docs/sc26_detection_impact_input_plan_2026-06-06.md`.
-SAM evaluator details are in `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md`.
-
-## Results Index
-
-The report-ready reconstruction artifacts are stored by experiment cycle:
-
-```text
-results/
-├── 2026-04-26-reconstruction/       # DeltaAI GH200 full reconstruction sweep
-├── 2026-04-28-h200-reconstruction/  # Delta H200 quick comparison sweep
-├── 2026-05-12-yifan-tiling-smoke/   # DeltaAI GH200 tiling smoke test
-├── 2026-05-12-yifan-tiling-pilot/   # DeltaAI GH200 tiling pilot
-├── 2026-05-15-yifan-selected-256-512-n50/  # DeltaAI GH200 selected 256 vs 512 comparison
-├── 2026-05-22-yifan-poster-visual-qa/      # Poster-ready original/reconstruction/difference panels
-├── 2026-05-22-jacob-compression-n20/       # DeltaAI GH200 Jacob compression-side validation
-├── 2026-06-05-tradeoff-smoke/              # DeltaAI GH200 compression x tile-size smoke matrix
-└── 2026-06-05-tradeoff-n50-lpips/          # DeltaAI GH200 N50 tradeoff matrix with LPIPS
-```
-
-Important files:
-
-| File | Use |
-|------|-----|
-| `results/2026-04-26-reconstruction/tables/sweep_summary.csv` | Main repeated step-sweep summary |
-| `results/2026-04-26-reconstruction/tables/batch_pilot_summary.csv` | Batch-size pilot summary |
-| `results/2026-04-26-reconstruction/plots/plot_time_vs_steps.png` | Reconstruction time vs denoising steps |
-| `results/2026-04-26-reconstruction/plots/plot_quality_vs_speed.png` | Speed-quality trade-off |
-| `results/2026-04-26-reconstruction/plots/plot_memory_vs_steps.png` | GPU memory comparison |
-| `results/2026-04-26-reconstruction/reports/profile_report_fp32.txt` | Detailed 65-step fp32 profile |
-| `results/2026-04-26-reconstruction/reports/profile_report_fp16.txt` | Detailed 65-step fp16 profile |
-| `results/2026-04-26-reconstruction/visual_examples_small/comparison_100_0005_0001.jpg` | Slide-ready visual comparison |
-| `results/2026-04-28-h200-reconstruction/tables/sweep_summary.csv` | Delta H200 quick step-sweep summary |
-| `results/2026-04-28-h200-reconstruction/tables/batch_pilot_summary.csv` | Delta H200 batch-size pilot summary |
-| `results/2026-04-28-h200-reconstruction/plots/plot_time_vs_steps.png` | Delta H200 time vs denoising steps |
-| `results/2026-04-28-h200-reconstruction/plots/plot_quality_vs_speed.png` | Delta H200 speed-quality trade-off |
-| `results/2026-05-12-yifan-tiling-pilot/tables/combined_summary.csv` | Yifan `N_IMAGES=8` tiling pilot summary |
-| `results/2026-05-12-yifan-tiling-pilot/visual_examples_small/` | Lightweight overview and seam-region examples for visual artifact checking |
-| `results/2026-05-12-yifan-tiling-smoke/tables/combined_summary.csv` | Yifan tiling smoke-test summary |
-| `results/2026-05-15-yifan-selected-256-512-n50/tables/combined_summary.csv` | Yifan `N_IMAGES=50` selected `256 x 256` vs `512 x 512` tiling summary |
-| `results/2026-05-22-yifan-poster-visual-qa/visual_examples_small/` | Poster-ready original/reconstruction/hot-difference panels for representative tiling cases |
-| `results/2026-05-22-jacob-compression-n20/tables/combined_summary.csv` | Jacob compression-side `N_IMAGES=20` baseline, resolution, batch, checkpoint, scaling, and storage summary |
-| `results/2026-06-05-tradeoff-smoke/tables/combined_summary.csv` | `N_IMAGES=8` compression-setting x tile-size smoke matrix |
-| `results/2026-06-05-tradeoff-n50-lpips/tables/combined_summary.csv` | Formal `N_IMAGES=50` compression-setting x tile-size matrix with LPIPS |
-| `results/2026-06-06-detection-label-selftest/tables/detection_summary.csv` | DeltaAI self-test confirming the N8 draft vehicle labels and detection evaluator run end to end |
-| `results/2026-06-06-detection-coco-vehicle-n8/tables/detection_summary.csv` | COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
-| `results/2026-06-06-detection-coco-vehicle-n50/tables/detection_summary.csv` | N50 COCO YOLOv8x vehicle detector pilot for original and selected reconstructed image sets |
-| `results/2026-06-06-sam-mask-impact-n50/tables/sam_mask_summary.csv` | N50 Meta SAM zero-shot mask-stability pilot for original and selected reconstructed image sets |
-| `data/detection_pilot/labels_yolo_vehicle_n8/` | Draft N8 YOLO vehicle labels for validating the object-detection impact pipeline |
-| `data/detection_pilot/labels_yolo_vehicle_n50_draft/` | Expanded auto-assisted draft N50 YOLO vehicle labels for pipeline scaling and review |
-| `data/detection_pilot/labels_yolo_vehicle_n8/manifest.json` | Pilot label counts, class mapping, source image size, and draft status |
-| `docs/sc26_next_experiment_tasks_2026-06-05.md` | Current checklist for completed N50 LPIPS tradeoff packaging and the next detection-impact run |
-| `docs/sc26_detection_impact_input_plan_2026-06-06.md` | Input audit and checklist for the pending object-detection impact run |
-| `docs/sc26_sam_zero_shot_segmentation_plan_2026-06-06.md` | Meta SAM zero-shot segmentation impact experiment plan and runbook |
-| `experiments/compression/evaluate_sam_mask_impact.py` | SAM mask-stability evaluator using fixed YOLO box prompts |
-| `experiments/compression/slurm/09_sam_mask_impact.sbatch` | DeltaAI wrapper for the SAM mask-stability evaluator |
-| `docs/progress_2026-05-12_yifan_tiling.md` | Weekly progress note for the tiling pilot result and next run |
-| `docs/progress_2026-05-14_yifan_tiling_next_steps.md` | Dated checklist for the `256 x 256` follow-up run, metrics, heatmap QA, and result-copy plan |
-| `docs/progress_2026-05-15_jacob_compression_prep.md` | DeltaAI runbook for Jacob's compression-side experiments due before 2026-05-20 |
-| `docs/progress_2026-05-21_yifan_poster_experiments.md` | Sunday 2026-05-24 checklist for poster panels, selected validation, and lightweight GitHub packaging |
-
-## Slides Index
-
-| Date | Deck | Coverage |
-|------|------|----------|
-| 2026-04-30 | `slides/2026-04-30-weekly-progress/SC26_CDC_Weekly_Progress_2026-04-30.pptx` | Weekly reconstruction progress: DeltaAI GH200 baseline, Delta H200 quick sweep, batch-size decision, matched GH200-vs-H200 comparison, and next steps |
-| 2026-05-12 | `slides/2026-05-12-yifan-tiling-progress/SC26_CDC_Yifan_Tiling_Progress_2026-05-12.pptx` | Yifan tiling progress: DeltaAI GH200 pilot, 512 tile recommendation, memory/runtime gains, visual artifact check, and next run |
-| 2026-05-22 | `slides/2026-05-22-yifan-jacob-poster-update/SC26_CDC_Yifan_Jacob_Poster_Update_2026-05-22.pptx` | Combined update: selected 256 tiling result, Jacob compression-side N=20 result, poster-ready visual QA panels, and poster assembly next steps |
-
-## Current DeltaAI Runtime Setup
-
-The working DeltaAI setup for the 2026-04-26 reconstruction run was:
-
-```bash
-module load python/miniforge3_pytorch/2.10.0
-conda activate base
-export PYTHONPATH=$HOME/.local/lib/python3.12/site-packages:$PYTHONPATH
-python -m pip install --user scikit-image compressai einops lpips ema-pytorch tqdm matplotlib pandas --quiet
-```
-
-The checkpoint used for the current reconstruction results was:
-
-```text
-/projects/bfod/$USER/cdc-deltaai/weights/x_param/image-l2-use_weight5-vimeo-d64-t8193-b0.2048-x-cosine-01-float32-aux0.9lpips_2.pt
-```
-
-## Delta vs DeltaAI Hardware Note
-
-Use this distinction when describing the experiments:
-
-- **DeltaAI** is the system used for the current reconstruction experiments. The [official DeltaAI documentation](https://docs.ncsa.illinois.edu/systems/deltaai/en/latest/index.html) describes it as powered by the NVIDIA **GH200 Grace Hopper Superchip**.
-- **Delta** is a related but separate NCSA system. The [Delta job-accounting documentation](https://docs.ncsa.illinois.edu/systems/delta/en/latest/user_guide/job_accounting.html) lists an `8-way H200` GPU node type.
-- Therefore, the 2026-04-26 results in this repository should be described as **DeltaAI GH200** results, not H100 or H200 results.
-- A Delta H200 comparison can be treated as future work only if the project allocation, partition name, and runtime environment are confirmed.
-
-ACCESS project resource snapshot from the portal, recorded 2026-04-26:
-
-| Project | Resource | Status | Balance | End date | Username |
-|---------|----------|--------|---------|----------|----------|
-| `CIV250023: Upscaling for Flood Resilience: A Benchmarking Study` | NCSA Delta GPU | Active | 1.08K of 2.04K GPU hours remaining (53%) | 2026-08-07 | `yyang48` |
-| `CIV250023: Upscaling for Flood Resilience: A Benchmarking Study` | NCSA DeltaAI | Active | 93 of 141 GPU hours remaining (66%) | 2026-08-07 | `yyang48` |
-
-Delta login and resource check completed on 2026-04-28:
-
-```text
-Host: dt-login02.delta.ncsa.illinois.edu
-Account: bfod-delta-gpu
-Balance: 1076 of 2037 GPU hours
-```
-
-Observed Delta GPU partitions:
-
-| Partition | GRES | Nodes | Notes |
-|-----------|------|-------|-------|
-| `gpuH200x8` | `gpu:h200:8` | 8 | Batch H200 partition, nodes `gpue[01-08]` |
-| `gpuH200x8-interactive` | `gpu:h200:8` | 8 | Interactive H200 partition, nodes `gpue[01-08]` |
-| `gpuA100x4` | `gpu:nvidia_a100:4` | 99 | Batch A100 4-GPU partition |
-| `gpuA100x4-interactive` | `gpu:nvidia_a100:4` | 100 | Interactive A100 4-GPU partition |
-| `gpuA100x8` | `gpu:nvidia_a100:8` | 6 | Batch A100 8-GPU partition |
-| `gpuA100x8-interactive` | `gpu:nvidia_a100:8` | 6 | Interactive A100 8-GPU partition |
-| `gpuA40x4` | `gpu:nvidia_a40:4` | 98 | Batch A40 partition |
-| `gpuA40x4-interactive` | `gpu:nvidia_a40:4` | 100 | Interactive A40 partition |
-
-No H100 partition was visible in the `sinfo` output from Delta on 2026-04-28. The next hardware comparison target should therefore be **DeltaAI GH200 vs Delta H200**, unless H100 access is confirmed separately.
-
-## Future Delta Hardware Comparison
-
-The current repository name and completed workflow are DeltaAI-focused, but the ACCESS project also has Delta GPU allocation. If the group wants to compare GH200 against H200 or any other Delta GPU, use Delta as a separate system.
-
-Delta login hostnames from the official Delta documentation:
-
-```bash
-ssh yyang48@login.delta.ncsa.illinois.edu
-# or
-ssh yyang48@dt-login.delta.ncsa.illinois.edu
-```
-
-After logging into Delta, confirm available hardware and charging before copying data or running jobs:
-
-```bash
-sinfo -o "%P %G %D %N"
-accounts
-module avail 2>&1 | grep -i -E "python|conda|cuda|pytorch"
-```
-
-H200 interactive smoke test command:
-
-```bash
-srun --account=bfod-delta-gpu --partition=gpuH200x8-interactive \
-     --nodes=1 --ntasks=1 --gres=gpu:h200:1 --mem=32G \
-     --time=00:10:00 --pty bash
-```
-
-Only after the Delta partition, account, and runtime environment are confirmed should we port the same experiment structure:
-
-1. Single-image sanity test.
-2. Batch-size pilot.
-3. Repeated step sweep.
-4. Same plots, tables, profile reports, and visual examples.
-
-Current task status:
-
-- This week's required reconstruction code runs are complete on DeltaAI GH200.
-- Jacob can be told that the realistic full-image reconstruction batch size is `1`.
-- Delta H200 is now confirmed runnable. The H200 batch pilot supports `batch_size=1` for the next step sweep because `batch_size=2` fit in memory but reduced throughput.
-- More visual examples or a full Delta H200 sweep are optional future work, not blockers for this week's task.
-
-## Compression Evaluation Goal
-
-The compression-side evaluation task is to:
-
-1. Apply the compression model on 100 drone images.
-2. Report the overall compression rate from the evaluation output.
-3. Compare the total size of the original images and the reconstructed images.
-4. Run the same evaluation workflow on additional confirmed GPU targets if needed:
-- DeltaAI GH200, already used for the current workflow
-- Delta H200, possible future comparison if allocation and partition access are confirmed
-
-For each run, collect and summarize the following outputs:
-- `compression_report.txt`
-- `compression_results.csv`
-- average BPP
-- overall compression ratio
-- total original image size
-- total reconstructed image size
-- file size ratio between original and reconstructed images
-
-## Compression Evaluation Status
-
-The DeltaAI x-parameterization workflow has been debugged and completed successfully on GH200 for the full 100-image evaluation sweep across all 6 checkpoints.
-
-Validated progress so far:
-- The DeltaAI environment issues were resolved, including Python user site-packages visibility and missing runtime dependencies.
-- The x-param evaluation script was updated to crop each input image to multiples of 64 so the compressor and hyperprior remain shape-aligned during inference.
-- A single-image GH200 validation run completed successfully and produced both `compression_report.txt` and `compression_results.csv`.
-- The full 100-image GH200 sweep was executed across all 6 checkpoints.
-- The final checkpoint (`b0.2048`) hit the walltime limit during the first batch run, so the remaining images were completed with a targeted resume job and then merged into a full 100-image result set.
-
-## Final GH200 Results for 100 Images
-
-| Checkpoint | Average BPP | Compression Ratio | Total Original Size | Total Reconstructed Size | File Size Ratio |
-|-----------|-------------|-------------------|---------------------|--------------------------|-----------------|
-| `b0.0032` | 0.4394 bits/pixel | 54.62x | 834.7 MB | 2.4 GB | 0.33x |
-| `b0.0064` | 0.2872 bits/pixel | 83.58x | 834.7 MB | 2.3 GB | 0.36x |
-| `b0.0128` | 0.1632 bits/pixel | 147.09x | 834.7 MB | 2.1 GB | 0.38x |
-| `b0.0512` | 0.7444 bits/pixel | 32.24x | 834.7 MB | 3.0 GB | 0.27x |
-| `b0.1024` | 0.5388 bits/pixel | 44.54x | 834.7 MB | 2.9 GB | 0.28x |
-| `b0.2048` | 0.3438 bits/pixel | 69.82x | 834.6 MB | 2.9 GB | 0.29x |
-
-Interpretation:
-- `b0.0128` produced the lowest average bitrate and the highest compression ratio relative to uncompressed 24-bit RGB.
-- Across all checkpoints, the reconstructed PNG outputs were still larger than the original JPEG files, so the BPP-based compression result and the stored-file-size comparison should be interpreted as different metrics.
-- The GH200 runtime was consistently about 143.4 seconds per image with 65 denoising steps.
-
-Remaining work:
-- If needed, run the same evaluation on Delta H200 once the partition name, allocation charging, and environment are confirmed.
-- Compare DeltaAI GH200 and Delta H200 runtime and output statistics side by side.
-
-## GPU Partition Summary
-
-The currently visible GPU-backed partitions from `sinfo -o "%P %G %D %N"` are:
-
-- `full` — NVIDIA GH200 120GB, 4 GPUs per node
-- `ghx4` — NVIDIA GH200 120GB, 4 GPUs per node
-- `ghx4-interactive` — NVIDIA GH200 120GB, 4 GPUs per node
-- `test` — no GPU nodes reported
-
-Practical interpretation:
-- `ghx4` is the confirmed batch partition currently used for the GH200 evaluation jobs.
-- `ghx4-interactive` is the confirmed interactive partition currently used for debugging and validation runs.
-- `full` also reports GH200 nodes, but the current workflow has been validated on `ghx4` and `ghx4-interactive`.
-- Delta H200 is documented under the separate Delta system. It is not the hardware used for the current DeltaAI run.
-
-In other words, the currently confirmed and usable GPU target in this environment is GH200.
-
-## Repository Structure
-
-```
-.
-├── epsilonparam/                      # epsilon-parameterization model
-├── xparam/                            # x-parameterization model
-│   ├── evaluate_compression.py        # evaluation script (compression rate + size report)
-│   ├── profile_reconstruction.py      # profiling script (timing breakdown + PSNR/SSIM + GPU memory)
-│   ├── sweep_steps.py                 # parameter sweep over denoising steps and precision
-│   ├── plot_results.py                # generates speed/quality trade-off plots from sweep CSV
-│   ├── run_evaluation.sh              # SLURM job: 100-image compression evaluation
-│   ├── run_b02048_resume.sh           # SLURM job: targeted resume for unfinished b0.2048 images
-│   └── run_profiling_sweep.sh         # SLURM job: full profiling + step sweep + plotting
-├── docs/                              # experiment plans and meeting-cycle progress notes
-├── experiments/
-│   └── compression/                   # SC26 compression experiment runner, configs, SLURM jobs, and result templates
-├── results/                           # lightweight report-ready results committed to GitHub
-│   └── 2026-04-26-reconstruction/     # Yifan reconstruction outputs for the 2026-05-01 meeting cycle
-├── data/                              # data placement notes; large data stays on DeltaAI
-├── imgs/                              # sample Kodak test images
-├── scripts/                           # DeltaAI helper scripts
-└── environment.yml                    # conda environment
-```
-
-## Model Weights
-
-HuggingFace: [rhyang/CDC_params](https://huggingface.co/rhyang/CDC_params)
-- `epsilon_lpips0.9.pt` — use with `--lpips_weight 0.9`
-- `epsilon_lpips0.0.pt` — use with `--lpips_weight 0.0`
-- x-param weights are ~2x larger (EMA + latest model saved; only EMA is loaded)
-
----
-
-## Running on NSF DeltaAI (UIUC)
-
-The commands below are preserved as the detailed DeltaAI reference for the original compression evaluation workflow. For the current reconstruction runtime used on 2026-04-26, start from the "Current DeltaAI Runtime Setup" section above.
-
-### Step 1: Log in to DeltaAI
-
-```bash
-ssh yyang48@dtai-login.delta.ncsa.illinois.edu
-```
-
-Use DUO two-factor authentication when prompted.
-
----
-
-### Step 2: Set up your working directory
-
-| Path | Use |
-|------|-----|
-| `$HOME` | Code, small files |
-| `/scratch/<allocation>/$USER/` | Large data, weights, outputs (faster I/O) |
-
-```bash
-mkdir -p /projects/bfod/$USER/cdc-deltaai
 cd /projects/bfod/$USER/cdc-deltaai
+git clone https://github.com/rayford295/sc26-cdc-deltaai.git code_main
+cd code_main
+git rev-parse --short HEAD
 ```
 
----
-
-### Step 3: Clone this repo on DeltaAI
+Stage draft N50 labels:
 
 ```bash
-git clone https://github.com/rayford295/sc26-cdc-deltaai.git code
-cd code
+mkdir -p /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft
+rsync -av data/detection_pilot/labels_yolo_vehicle_n50_draft/labels/ \
+  /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft/
 ```
 
----
-
-### Step 4: Transfer your image data
-
-From your **local machine**:
+Run the formal compression x tile-size matrix:
 
 ```bash
-# Transfer drone images (e.g., 100_0005/ dataset)
-rsync -avz /path/to/your/images/ \
-  yyang48@dtai-login.delta.ncsa.illinois.edu:/projects/bfod/$USER/cdc-deltaai/data/imgs/
+RUN_STAMP=YYYYMMDD_tradeoff_n50_lpips \
+N_IMAGES=50 \
+SAVE_VISUAL_LIMIT=8 \
+COMPUTE_LPIPS=1 \
+LPIPS_MAX_EDGE=512 \
+TRADEOFF_COMPRESSION_ROLES="high_quality balanced high_compression" \
+TRADEOFF_TILE_SIZES="256 512" \
+sbatch --mem=96G --time=18:00:00 \
+  --export=ALL,REPO_DIR=$PWD \
+  experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
 ```
 
----
-
-### Step 5: Download model weights
+Prepare image sets for downstream detection or SAM evaluation:
 
 ```bash
-# On DeltaAI
-cd /projects/bfod/$USER/cdc-deltaai
-mkdir -p weights
-
-module load anaconda3
-conda activate exp_pytorch
-pip install huggingface_hub --quiet
-
-python -c "
-from huggingface_hub import snapshot_download
-snapshot_download(repo_id='rhyang/CDC_params', local_dir='./weights')
-"
+python experiments/compression/prepare_detection_image_sets.py \
+  --ground_truth_dir /projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+  --image_sets \
+    original=/projects/bfod/$USER/cdc-deltaai/data/imgs \
+    balanced_256=/path/to/balanced_tile_256/visuals \
+    balanced_512=/path/to/balanced_tile_512/visuals \
+    max_compression_256=/path/to/high_compression_tile_256/visuals \
+  --output_dir /projects/bfod/$USER/cdc-deltaai/output/detection_image_sets/vehicle_n50_tradeoff \
+  --overwrite
 ```
 
----
-
-### Step 6: Set up the conda environment
+Run the COCO vehicle detection pilot:
 
 ```bash
-module load anaconda3
-
-# First time only (~10 min)
-conda env create -f code/environment.yml
-conda activate exp_pytorch
+RUN_STAMP=YYYYMMDD_detection_coco_vehicle_n50 \
+DETECTION_INSTALL_ULTRALYTICS=1 \
+DETECTION_GT_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+DETECTION_MODEL=/projects/bfod/$USER/cdc-deltaai/weights/detectors/yolov8x.pt \
+DETECTION_IMAGE_SETS="original=/path/to/original balanced_256=/path/to/balanced_256 balanced_512=/path/to/balanced_512 max_compression_256=/path/to/max_compression_256" \
+DETECTION_CLASSES="2 5 7" \
+DETECTION_CLASS_MAP="2=0 5=0 7=0" \
+DETECTION_DROP_UNMAPPED=1 \
+DETECTION_RESTRICT_TO_GT=1 \
+DETECTION_IMGSZ=1280 \
+DETECTION_CONF=0.001 \
+sbatch --mem=64G --time=04:00:00 \
+  --export=ALL,REPO_DIR=$PWD \
+  experiments/compression/slurm/08_object_detection_impact.sbatch
 ```
 
-> If `environment.yml` fails due to CUDA version conflicts, install manually:
-> ```bash
-> conda create -n exp_pytorch python=3.9
-> conda activate exp_pytorch
-> conda install pytorch=2.0.0 torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
-> pip install compressai einops ema-pytorch lpips opencv-python scikit-image timm tqdm
-> ```
-
----
-
-### Step 7: Submit the evaluation job
-
-The default sweep script now processes 100 images across all 6 x-param checkpoints:
+Run the SAM mask-stability pilot:
 
 ```bash
-cd /projects/bfod/$USER/cdc-deltaai/code
-mkdir -p xparam/logs output/evaluation
-
-sbatch xparam/run_evaluation.sh
+RUN_STAMP=YYYYMMDD_sam_vehicle_n50 \
+SAM_CHECKPOINT=/projects/bfod/$USER/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
+SAM_MODEL_TYPE=vit_h \
+SAM_PROMPT_LABEL_DIR=/projects/bfod/$USER/cdc-deltaai/data/labels_yolo_vehicle_n50_draft \
+SAM_IMAGE_SETS="original=/path/to/original balanced_256=/path/to/balanced_256 balanced_512=/path/to/balanced_512 max_compression_256=/path/to/max_compression_256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+sbatch --mem=96G --time=08:00:00 \
+  --export=ALL,REPO_DIR=$PWD \
+  experiments/compression/slurm/09_sam_mask_impact.sbatch
 ```
 
-If the final checkpoint sweep is interrupted and only the unfinished `b0.2048` images need to be completed, use:
+## Remaining Quality Steps
 
-```bash
-sbatch xparam/run_b02048_resume.sh
-```
+These items are not blockers for the June 2 response package. They are the next gates before stronger manuscript claims:
 
-Monitor the job:
+- Manually review and correct the N50 draft vehicle labels.
+- Expand the reviewed label set if time allows.
+- Rerun Experiment 4 with a project-specific detector if one becomes available.
+- Keep the repository private unless large local artifacts are removed and the label/data-sharing boundary is rechecked.
 
-```bash
-squeue -u $USER                          # check status
-tail -f xparam/logs/eval_<job_id>.log   # live output
-scancel <job_id>                         # cancel if needed
-```
+## Citation and Acknowledgment Notes
 
----
-
-### Step 8: Retrieve results
-
-From your **local machine**:
-
-```bash
-rsync -avz \
-  yyang48@dtai-login.delta.ncsa.illinois.edu:/projects/bfod/$USER/cdc-deltaai/output/ \
-  ./output/
-```
-
-The output folder will contain:
-- `compression_report.txt` — overall compression rate summary
-- `compression_results.csv` — per-image BPP and file size data
-- `*_recon.png` — reconstructed images
-
----
-
-### Step 9: Interactive session (for debugging)
-
-```bash
-srun --account=bfod-dtai-gh --partition=ghx4-interactive \
-     --nodes=1 --ntasks=1 --gres=gpu:1 --mem=32G \
-     --time=01:00:00 --pty bash
-```
-
----
-
-## DeltaAI GPU Partitions
-
-| Partition | GPU | Notes |
-|-----------|-----|-------|
-| `ghx4` | 4x NVIDIA GH200 120GB | Current confirmed batch partition |
-| `ghx4-interactive` | 4x NVIDIA GH200 120GB | Current confirmed interactive partition |
-| `full` | 4x NVIDIA GH200 120GB | Visible in `sinfo`, but not the current validated workflow target |
-
-Delta is separate from DeltaAI. The Delta documentation lists an `8-way H200` GPU node type, but the current repository results were generated on DeltaAI GH200.
-
----
-
-## Evaluation Script
-
-`xparam/evaluate_compression.py` processes N drone images through the CDC model and reports:
-
-1. **Overall compression rate** — average BPP vs uncompressed RGB (24 bpp)
-2. **File size comparison** — total original JPEG size vs reconstructed PNG size
-
-It also supports `--start_index` for partial resume runs when only a subset of the sorted image list needs to be processed.
-
-```bash
-python xparam/evaluate_compression.py \
-  --ckpt        /path/to/checkpoint.pt \
-  --img_dir     /path/to/images \
-  --out_dir     /path/to/output \
-  --n_images    100 \
-  --start_index 0 \
-  --lpips_weight 0.9
-```
-
----
-
----
-
-## Reconstruction Profiling and Optimization (Yifan's Task)
-
-### Goal
-
-The reconstruction (decoding / diffusion sampling) pipeline currently takes **~143 seconds per image** on GH200 with 65 denoising steps. The goal is to:
-
-1. **Profile** the pipeline to understand where time is spent (model load vs. inference vs. post-processing).
-2. **Sweep parameters** — especially the number of denoising steps — to map the speed / quality trade-off.
-3. **Benchmark fp16 vs. fp32** to see if mixed precision saves time without hurting quality.
-4. **Identify the optimal configuration** (fewest steps where PSNR/SSIM plateau).
-
-### New Scripts
-
-| Script | What it does |
-|--------|-------------|
-| `profile_reconstruction.py` | Profiles one configuration in detail: split timing (load / infer / postproc), GPU memory, PSNR, SSIM |
-| `sweep_steps.py` | Sweeps step counts, precision, batch size, and repeats — model loaded once, reused for all configs |
-| `plot_results.py` | Reads `sweep_results.csv` and saves 5 PNG plots |
-| `run_profiling_sweep.sh` | SLURM job that runs profiling, batch pilot, repeated sweep, and plotting |
-
-### Step-by-Step Instructions
-
-#### Step 1 — Install extra dependencies
-
-`scikit-image` and the CDC helper libraries are not always available in DeltaAI's
-shared PyTorch environment. Install them once into your user site:
-
-```bash
-module load python/miniforge3_pytorch/2.10.0
-conda activate base
-export PYTHONPATH=$HOME/.local/lib/python3.12/site-packages:$PYTHONPATH
-python -m pip install --user scikit-image compressai einops lpips ema-pytorch tqdm matplotlib pandas --quiet
-```
-
-> **Note:** Do this in an interactive session or add it to the job script.
-> The `run_profiling_sweep.sh` script already includes this pip install step.
-
----
-
-#### Step 2 — Edit paths in the SLURM script
-
-Open `xparam/run_profiling_sweep.sh` and update the path variables at the top:
-
-```bash
-REPO_DIR="/projects/bfod/$USER/cdc-deltaai/code"   # where you cloned the repo
-IMG_DIR="/projects/bfod/$USER/cdc-deltaai/data/imgs"  # drone images directory
-WEIGHT_DIR="/projects/bfod/$USER/cdc-deltaai/weights" # downloaded model weights
-
-# Pick whichever checkpoint you want to profile (b0.2048 recommended as the largest)
-CKPT="${WEIGHT_DIR}/x_param/image-l2-use_weight5-vimeo-d64-t8193-b0.2048-x-cosine-01-float32-aux0.9lpips_2.pt"
-LPIPS_WEIGHT=0.9
-```
-
-> **Note:** The script uses `$USER` automatically, so only the base paths need editing.
-
----
-
-#### Step 3 — Create the log directory
-
-```bash
-mkdir -p xparam/logs
-```
-
-SLURM writes stdout/stderr to `xparam/logs/profiling_<jobid>.log`.
-
----
-
-#### Step 4 — Submit the job
-
-```bash
-cd /projects/bfod/$USER/cdc-deltaai/code
-sbatch xparam/run_profiling_sweep.sh
-```
-
-Monitor progress:
-
-```bash
-squeue -u $USER                                   # check if the job is running
-tail -f xparam/logs/profiling_<jobid>.log         # live log output
-```
-
-Estimated wall time: **~5–7 hours** for the full profiling job, including the batch-size pilot and 3 repeated step-sweep runs. The job script requests 8 hours.
-
----
-
-#### Step 5 — Run a quick sanity check first (optional but recommended)
-
-Before submitting the full sweep, validate that the scripts work with an interactive session:
-
-```bash
-# Start an interactive GPU session
-srun --account=bfod-dtai-gh --partition=ghx4-interactive \
-     --nodes=1 --ntasks=1 --gres=gpu:1 --mem=32G \
-     --time=00:30:00 --pty bash
-
-module load python/miniforge3_pytorch/2.10.0
-conda activate base
-export PYTHONPATH=$HOME/.local/lib/python3.12/site-packages:$PYTHONPATH
-cd /projects/bfod/$USER/cdc-deltaai/code/xparam
-
-# Quick profile: 1 image, 20 steps
-python profile_reconstruction.py \
-    --ckpt /projects/bfod/$USER/cdc-deltaai/weights/x_param/image-l2-use_weight5-vimeo-d64-t8193-b0.2048-x-cosine-01-float32-aux0.9lpips_2.pt \
-    --img_dir /projects/bfod/$USER/cdc-deltaai/data/imgs \
-    --out_dir /projects/bfod/$USER/cdc-deltaai/output/test_profile \
-    --n_denoise_step 20 \
-    --lpips_weight 0.9 \
-    --n_images 1
-```
-
-If this completes and prints a timing report, the full sweep is safe to submit.
-
----
-
-#### Step 6 — Retrieve results
-
-From your **local machine**:
-
-```bash
-rsync -avz \
-  yyang48@dtai-login.delta.ncsa.illinois.edu:/projects/bfod/$USER/cdc-deltaai/output/ \
-  ./output/
-```
-
-Output structure:
-
-```
-output/
-├── profiling/
-│   ├── baseline_65steps_fp32/
-│   │   ├── profile_report.txt      # timing breakdown summary
-│   │   └── profile_results.csv     # per-image timing + PSNR + SSIM + memory
-│   └── baseline_65steps_fp16/
-│       ├── profile_report.txt
-│       └── profile_results.csv
-├── sweep/
-│   ├── batch_pilot/
-│   │   ├── sweep_results.csv       # batch-size pilot, includes failures if CUDA OOM occurs
-│   │   └── sweep_summary.csv
-│   └── step_sweep/
-│       ├── steps5_fp32_batch1/     # reconstructed PNGs for each config
-│       ├── steps10_fp32_batch1/ ...
-│       ├── sweep_results.csv       # per-image data for all configs (input to plot_results.py)
-│       └── sweep_summary.csv       # one-row-per-config aggregated stats
-└── plots/
-    ├── plot_time_vs_steps.png      # inference time vs denoising steps
-    ├── plot_psnr_vs_steps.png      # PSNR vs denoising steps
-    ├── plot_ssim_vs_steps.png      # SSIM vs denoising steps
-    ├── plot_quality_vs_speed.png   # PSNR vs time scatter (key trade-off chart)
-    └── plot_memory_vs_steps.png    # GPU memory vs denoising steps
-```
-
----
-
-#### Step 7 — Generate plots locally (if preferred)
-
-If you want to regenerate or tweak the plots on your local machine after retrieving the CSV:
-
-```bash
-cd xparam
-python plot_results.py \
-    --sweep_csv ../output/sweep/step_sweep/sweep_results.csv \
-    --out_dir   ../output/plots
-```
-
-Requires: `pip install matplotlib pandas scikit-image`
-
----
-
-### Important Notes and Known Gotchas
-
-#### Timing accuracy
-- All inference timing uses **CUDA Events** (`torch.cuda.Event`), not `time.time()`.
-  CUDA operations are asynchronous — `time.time()` returns before GPU kernels finish
-  and systematically under-reports latency. Always use CUDA Events for GPU timing.
-
-#### Image cropping
-- Input images are cropped to **multiples of 64** before inference (same as `evaluate_compression.py`).
-  This is required by the compressor/hyperprior downsampling stack. PSNR/SSIM are computed
-  against the cropped original, not the full image.
-
-#### Model is loaded once in the sweep
-- `sweep_steps.py` loads the model **once** and reuses it across all step configurations.
-  This correctly isolates inference time from the one-time loading cost (~10–30s).
-  Do not add model reloading between step counts — it would distort the timing.
-
-#### fp16 and numerical stability
-- fp16 (`--fp16` / `--test_fp16`) uses `torch.cuda.amp.autocast`. On GH200, this may
-  give minimal speedup since GH200 excels at fp32. If outputs look visually degraded at
-  very low step counts with fp16, that is expected — fewer steps + reduced precision
-  compound noise accumulation errors.
-
-#### PSNR / SSIM interpretation
-- PSNR > 30 dB and SSIM > 0.90 are generally considered good perceptual quality.
-- At very low step counts (≤ 10), expect PSNR to drop noticeably. The elbow point
-  (where quality plateaus but time keeps improving) is typically around **20–30 steps**.
-
-#### Batch-size pilot
-- The drone images are full-resolution 5472 × 3648 JPEGs, cropped to 5440 × 3648.
-  Use `batch_size=1` as the safe baseline. The job script tests batch sizes 1 and 2
-  on a small pilot. Use batch 2 only if it completes without CUDA OOM and improves
-  images/hour.
-
-#### Walltime budget
-- Each image at 65 steps takes ~143s. The current job includes baseline profiling,
-  a small batch-size pilot, and a repeated 7-config × 2-precision × 5-image sweep.
-  The job is set to 8 hours with `--time=08:00:00`; monitor and cancel early if done.
-
-#### Output CSV column reference
-
-The profiling and sweep CSVs include these key columns where applicable:
-
-| Column | Description |
-|--------|-------------|
-| `n_denoise_step` | Number of diffusion denoising steps |
-| `precision` | `fp32` or `fp16` |
-| `repeat` | Repeat index for repeated runs |
-| `batch_size` | Requested inference batch size |
-| `effective_batch_size` | Actual image count in that batch |
-| `inference_sec` | GPU-accurate inference time (CUDA Events) |
-| `batch_inference_sec` | Total inference time for the whole batch |
-| `images_per_hour` | Throughput derived from batch inference time |
-| `postproc_sec` | Post-processing time (clamp + PNG save) |
-| `model_load_sec` | One-time model load time (same for all rows in profile CSV) |
-| `peak_gpu_mem_mb` | Peak GPU memory during inference |
-| `psnr_db` | PSNR vs cropped original (dB, higher = better) |
-| `ssim` | SSIM vs cropped original (0–1, higher = better) |
-| `bpp` | Bits per pixel (compression bitrate) |
-| `compression_ratio` | 24 / bpp (vs uncompressed RGB) |
-
----
-
-## DeltaAI Documentation
-
-- Official docs: https://docs.ncsa.illinois.edu/systems/deltaai/
-- Help: help@ncsa.illinois.edu
+The poster draft acknowledges GH200 and H200 GPU resources through ACCESS allocation `CIV250023`. Keep that acknowledgment in poster and manuscript materials when using these results.
