@@ -1,0 +1,8 @@
+# Metadata-only descriptor for local review (YOLO format).
+# Raw images are NOT tracked in git; see image_list.txt for filenames.
+# Annotations are normalized YOLO (class cx cy w h), resolution-independent.
+path: vehicle
+images: image_list.txt
+labels: labels
+names:
+  0: vehicle
