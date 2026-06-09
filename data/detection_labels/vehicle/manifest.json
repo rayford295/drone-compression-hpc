@@ -1,0 +1,17 @@
+{
+  "dataset": "detection_labels_vehicle",
+  "status": "human_labeled",
+  "source": "Roboflow export (Vehicle&Building_labels)",
+  "format": "YOLO (normalized: class cx cy w h)",
+  "classes": {
+    "0": "vehicle"
+  },
+  "image_count": 100,
+  "box_count_total": 2065,
+  "avg_boxes_per_image": 20.6,
+  "notes": [
+    "Human-annotated vehicle/building labels for the 100_0005 DJI image set.",
+    "Supersedes the auto-assisted draft in data/detection_pilot for formal evaluation.",
+    "Raw images are intentionally not tracked in git (see image_list.txt)."
+  ]
+}

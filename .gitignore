@@ -19,3 +19,8 @@ weights/
 *.ckpt
 100_0005/
 data/100_0005/
+
+# generated label previews (derived images, not tracked)
+preview_labeled/
+# safety: never commit raw images under detection_labels
+data/detection_labels/**/images/
