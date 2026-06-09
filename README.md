@@ -16,7 +16,7 @@ Recommended setting:
 - Keep `balanced_checkpoint_b00064` with `512 x 512` tiling as the quality-safe backup.
 - Keep `high_compression_checkpoint_b00128` as a stress-test setting only.
 
-The detection and SAM downstream experiments are complete as pilots. The N50 vehicle labels are draft labels, so these results support sensitivity analysis and workflow validation. They should not be presented as final paper-grade detection benchmarks until the labels are manually reviewed and, ideally, a project-specific detector is available.
+The detection and SAM downstream experiments are complete as pilots. The N50 vehicle labels are draft labels, so these results support sensitivity analysis and workflow validation. They should not be presented as final paper-grade detection benchmarks until the labels are manually reviewed and, ideally, a project-specific detector is available. Human labels for `vehicle` and `building` are now available in `data/detection_labels/`, and a more complete open-vocabulary detection report (Experiment 4b) is planned on top of them — see `docs/sc26_compression_detection_openvocab_veh_bldg_plan_2026-06-09.md`.
 
 ## Poster Storyline
 
@@ -39,6 +39,7 @@ Current poster framing:
 | Experiment 2 | Reconstruction optimization | Complete | 256 and 512 tiling were validated. 256 tiles are fastest and lowest memory; 512 tiles are the quality backup. |
 | Experiment 3 | Compression x tile-size tradeoff | Complete | The N50 LPIPS matrix finished all 9 rows on DeltaAI GH200 under Slurm job `2422336`. |
 | Experiment 4 | Object-detection impact | Complete as pilot | The N50 COCO YOLOv8x vehicle workflow finished under Slurm job `2426722`; labels remain draft. |
+| Experiment 4b | Open-vocabulary vehicle & building detection | Planned | A more complete and detailed detection report. Uses the new human labels in `data/detection_labels/` (vehicle + building) with an open-vocabulary detector. Design: `docs/sc26_compression_detection_openvocab_veh_bldg_plan_2026-06-09.md`. Not yet run. |
 | Add-on | SAM zero-shot mask stability | Complete as pilot | Meta SAM ViT-H finished on 50 images and 829 prompts under Slurm job `2426827`; failed prompt rate was 0. |
 | Add-on | GH200 vs H200 comparison | Complete | H200 is runnable and is about 3.6% faster than the prior GH200 fp32 sweep at matched step counts. |
 
@@ -93,6 +94,26 @@ Source: `results/2026-06-06-detection-coco-vehicle-n50/`.
 
 Interpretation: balanced reconstructions remain closer to the original baseline than maximum compression. Precision is low because `DETECTION_CONF=0.001` intentionally keeps many low-confidence predictions for AP and recall analysis.
 
+#### Planned: Open-Vocabulary Vehicle and Building Detection (Experiment 4b)
+
+The pilot above used auto-assisted draft vehicle labels and a single class. The next
+detection report upgrades this into a more complete and detailed evaluation:
+
+- **Ground truth:** new human labels in `data/detection_labels/` — `vehicle` (100 images,
+  2,065 boxes) and `building` (100 images, 2,422 boxes), scored as two classes.
+- **Detector:** an open-vocabulary model (YOLO-World, with GroundingDINO as fallback) so
+  both `vehicle` and `building` can be detected from text prompts; COCO YOLOv8x has no
+  building class.
+- **Comparison:** the same Original / Best quality / Balanced / Max compression structure,
+  on a fixed 50-image test set (`100_0005_0001`–`0050`). Traditional-codec (JPEG)
+  baselines are out of scope.
+- **Reporting:** mAP@0.5, mAP@0.5:0.95, precision, recall, F1 per class, plus per-object-
+  size AP (small/medium/large), paired per-image deltas, and dual-threshold (AP-curve and
+  operating-point) views.
+
+Full design: `docs/sc26_compression_detection_openvocab_veh_bldg_plan_2026-06-09.md`.
+Status: planned; experiment details to be confirmed before the HPC run. Not yet run.
+
 ### SAM Zero-Shot Mask Stability
 
 The SAM add-on uses the same N50 vehicle boxes as prompts and compares the reconstructed-image mask with the original-image mask for the same image and prompt. This is not class-aware detection accuracy. It is a zero-shot segmentation boundary-stability check.
@@ -130,6 +151,7 @@ The H200 comparison confirms that the workflow runs on H200. The speed differenc
 | `experiments/compression/` | DeltaAI experiment runners, SLURM scripts, detection evaluator, SAM evaluator, summarizers, and poster-panel helpers. |
 | `docs/` | Dated runbooks, experiment plans, and progress notes. |
 | `data/detection_pilot/` | Draft YOLO vehicle labels for N8 and N50 detection-pipeline validation. |
+| `data/detection_labels/` | Human-labeled YOLO labels for `vehicle` (100 images, 2,065 boxes) and `building` (100 images, 2,422 boxes). Official ground truth for Experiment 4b; labels only, raw images not tracked. |
 | `slides/` | Editable progress decks and rebuild scripts from earlier SC26 update cycles. |
 | `xparam/`, `epsilonparam/` | Model code adapted from the CDC implementation. |
 
