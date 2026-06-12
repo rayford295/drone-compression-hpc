@@ -1,0 +1,5 @@
+configuration,num_images,num_prompts,mean_mask_iou,mean_dice,mean_area_ratio,mean_abs_area_change,mean_centroid_shift_px,failed_prompt_rate
+original,50,1013,1.0,1.0,1.0,0.0,0.0,0.0
+high_quality_512,50,1013,0.735026,0.838327,1.006251,0.041569,16.252926,0.0
+balanced_256,50,1013,0.734634,0.838039,1.00321,0.0396,16.301191,0.0
+max_compression_256,50,1013,0.733121,0.83716,1.004961,0.043506,16.38982,0.0

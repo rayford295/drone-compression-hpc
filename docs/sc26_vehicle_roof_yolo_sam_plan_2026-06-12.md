@@ -143,6 +143,24 @@ SAM does not produce class-aware detection metrics. It uses the human boxes as p
 and compares masks across original and reconstructed image sets. Run it separately for
 vehicle and roof so the tables are interpretable.
 
+Full N50 runs completed on 2026-06-12. The lightweight result package is
+`results/2026-06-12-sam-vehicle-roof-human-n50/`.
+
+Summary:
+
+| Prompt class | Configuration | Prompts | Mean mask IoU | Mean Dice | Abs. area change | Failed prompt rate |
+|--------------|---------------|--------:|--------------:|----------:|-----------------:|-------------------:|
+| vehicle | high_quality_512 | 1013 | 0.735026 | 0.838327 | 0.041569 | 0.000000 |
+| vehicle | balanced_256 | 1013 | 0.734634 | 0.838039 | 0.039600 | 0.000000 |
+| vehicle | max_compression_256 | 1013 | 0.733121 | 0.837160 | 0.043506 | 0.000000 |
+| roof | high_quality_512 | 1201 | 0.900123 | 0.945443 | 0.025937 | 0.000000 |
+| roof | balanced_256 | 1201 | 0.898891 | 0.944659 | 0.027758 | 0.000000 |
+| roof | max_compression_256 | 1201 | 0.895618 | 0.942522 | 0.029802 | 0.000000 |
+
+Interpretation: all prompts returned usable masks. Roof masks are more stable than
+vehicle masks under reconstruction, which is consistent with roofs being larger objects.
+Balanced 256 remains close to high quality 512 for both prompt classes.
+
 Build merged prompt labels:
 
 ```bash
