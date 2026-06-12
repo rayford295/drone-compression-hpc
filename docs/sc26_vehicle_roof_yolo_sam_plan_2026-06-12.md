@@ -148,6 +148,28 @@ sbatch --export=ALL,REPO_DIR=$PWD \
 Use the trained `best.pt` as `DETECTION_MODEL` in `08_object_detection_impact.sbatch`
 with a merged vehicle+roof N50 GT folder.
 
+The YOLOv8s smoke model completed successfully on 2026-06-12. Validation on the
+10-image validation split reached all-class `mAP@0.5=0.925` and `mAP@0.5:0.95=0.665`.
+Roof validation performance was strong (`mAP@0.5=0.953`), so the supervised path replaces
+YOLO-World for roof detection.
+
+The lightweight result package is
+`results/2026-06-12-yolo-vehicle-roof-human-n50/`. The final test-set operating point
+uses `conf=0.50`, selected from the confidence sweep because it gives the highest overall
+F1 and keeps precision and recall balanced.
+
+| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | GT | Predictions |
+|---------------|--------:|-------------:|----------:|-------:|---:|---:|------------:|
+| original | 0.863715 | 0.607265 | 0.884058 | 0.881662 | 0.882858 | 2214 | 2208 |
+| high_quality_512 | 0.845486 | 0.488057 | 0.892758 | 0.868564 | 0.880495 | 2214 | 2154 |
+| balanced_256 | 0.839016 | 0.481047 | 0.877467 | 0.863595 | 0.870476 | 2214 | 2179 |
+| max_compression_256 | 0.833041 | 0.474657 | 0.878704 | 0.857272 | 0.867856 | 2214 | 2160 |
+
+Interpretation: the supervised detector is stable for both classes. `balanced_256` reduces
+overall F1 by about `1.4%` relative to original, while `max_compression_256` reduces F1 by
+about `1.7%`. The stricter `mAP@0.5:0.95` metric is more sensitive to reconstruction,
+dropping by about `20.8%` for `balanced_256` and `21.8%` for `max_compression_256`.
+
 ## Track C — SAM for Vehicle and Roof
 
 SAM does not produce class-aware detection metrics. It uses the human boxes as prompts
