@@ -62,6 +62,12 @@ def main() -> None:
     parser.add_argument("--output_dir", required=True, help="Merged 2-class GT output directory")
     parser.add_argument("--vehicle_class", type=int, default=0)
     parser.add_argument("--building_class", type=int, default=1)
+    parser.add_argument(
+        "--max_images",
+        type=int,
+        default=0,
+        help="Optional cap after sorting normalized image IDs, e.g. 50 for the N50 run.",
+    )
     parser.add_argument("--keep-hashed-names", action="store_true",
                         help="Keep the Roboflow hashed filenames instead of normalizing to the source-image stem.")
     args = parser.parse_args()
@@ -75,6 +81,8 @@ def main() -> None:
     stems = sorted(set(veh) | set(bld))
     if not stems:
         sys.exit("No labels found in either input directory.")
+    if args.max_images:
+        stems = stems[:args.max_images]
 
     veh_boxes = bld_boxes = images_with_both = 0
     for stem in stems:

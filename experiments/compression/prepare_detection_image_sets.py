@@ -17,6 +17,7 @@ import shutil
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+ROBOFLOW_SUFFIX = re.compile(r"_JPG\.rf\.[0-9a-fA-F]+$", re.IGNORECASE)
 
 
 def parse_label_mapping(value: str) -> tuple[str, pathlib.Path]:
@@ -30,7 +31,7 @@ def parse_label_mapping(value: str) -> tuple[str, pathlib.Path]:
 
 
 def normalize_image_id(stem: str) -> str:
-    cleaned = stem
+    cleaned = ROBOFLOW_SUFFIX.sub("", stem)
     patterns = [
         r"_tile\d+_stitched$",
         r"_tile\d+_recon$",

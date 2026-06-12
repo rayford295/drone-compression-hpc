@@ -22,9 +22,15 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import sys
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG", ".tif", ".tiff"}
+ROBOFLOW_SUFFIX = re.compile(r"_JPG\.rf\.[0-9a-fA-F]+$", re.IGNORECASE)
+
+
+def normalize_image_id(stem: str) -> str:
+    return ROBOFLOW_SUFFIX.sub("", stem)
 
 
 def main() -> None:
@@ -78,7 +84,9 @@ def main() -> None:
                 lines.append(f"{int(c)} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f} {p:.6f}")
                 per_class[int(c)] = per_class.get(int(c), 0) + 1
                 total_boxes += 1
-        (out / f"{img.stem}.txt").write_text("\n".join(lines) + ("\n" if lines else ""))
+        (out / f"{normalize_image_id(img.stem)}.txt").write_text(
+            "\n".join(lines) + ("\n" if lines else "")
+        )
 
     print(f"Wrote predictions for {len(images)} images to {out}")
     print(f"  total predicted boxes: {total_boxes}")

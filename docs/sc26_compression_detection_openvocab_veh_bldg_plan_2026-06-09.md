@@ -137,12 +137,19 @@ OPENVOCAB_MODEL=yolov8x-worldv2.pt \
 OPENVOCAB_PROMPTS="vehicle building" \
 OPENVOCAB_CONF=0.02 \
 OPENVOCAB_IMGSZ=1280 \
+OPENVOCAB_MAX_IMAGES=50 \
 OPENVOCAB_IMAGE_SETS="original=/path/to/original high_quality_512=/path/to/hq512 balanced_256=/path/to/bal256 max_compression_256=/path/to/max256" \
 sbatch --export=ALL,REPO_DIR=$PWD \
   experiments/compression/slurm/10_openvocab_detection_veh_bldg.sbatch
 ```
 
 Sanity gate: run with only `OPENVOCAB_IMAGE_SETS="original=/path/to/original"` first and check `detection_per_class.csv` — if YOLO-World cannot detect vehicles/buildings on the originals (near-zero AP), switch the detector (GroundingDINO) or fall back to training a 2-class YOLO before scoring the compressed sets.
+
+The human-labeled Roboflow export at `Vehicle&Building_labels/` can be used as
+the original image source. Its vehicle/building image copies are duplicate
+full-resolution `5472 x 3648` JPEGs, and the pipeline normalizes Roboflow
+hashed stems such as `100_0005_0001_JPG.rf.<hash>` back to `100_0005_0001` so
+they align with the merged GT labels and reconstructed image stems.
 
 ## Task framing (paper) — detection, not classification (clarified 2026-06-11)
 
@@ -176,7 +183,7 @@ RUN_STAMP=YYYYMMDD_sam_veh_bldg_n50 \
 SAM_CHECKPOINT=/projects/bfod/$USER/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
 SAM_MODEL_TYPE=vit_h \
 SAM_PROMPT_LABEL_DIR=/projects/bfod/$USER/cdc-deltaai/output/.../10_openvocab_detection_veh_bldg/gt_vehicle_building \
-SAM_IMAGE_SETS="original=/path/to/original balanced_256=/path/to/bal256 balanced_512=/path/to/hq512 max_compression_256=/path/to/max256" \
+SAM_IMAGE_SETS="original=/path/to/original high_quality_512=/path/to/hq512 balanced_256=/path/to/bal256 max_compression_256=/path/to/max256" \
 SAM_PROMPT_BATCH_SIZE=4 \
 sbatch --export=ALL,REPO_DIR=$PWD \
   experiments/compression/slurm/09_sam_mask_impact.sbatch

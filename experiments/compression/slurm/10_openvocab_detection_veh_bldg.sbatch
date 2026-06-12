@@ -15,7 +15,7 @@
 # Original vs CDC-reconstructed image sets, scored against the human 2-class GT.
 #
 # Required:
-#   OPENVOCAB_IMAGE_SETS="original=/path balanced_256=/path balanced_512=/path max_compression_256=/path"
+#   OPENVOCAB_IMAGE_SETS="original=/path high_quality_512=/path balanced_256=/path max_compression_256=/path"
 # Common (have sensible defaults):
 #   OPENVOCAB_VEHICLE_DIR   default: data/detection_labels/vehicle/labels
 #   OPENVOCAB_BUILDING_DIR  default: data/detection_labels/building/labels
@@ -23,6 +23,7 @@
 #   OPENVOCAB_MODEL         default: yolov8x-worldv2.pt
 #   OPENVOCAB_CONF          default: 0.02
 #   OPENVOCAB_IMGSZ         default: 1280
+#   OPENVOCAB_MAX_IMAGES    default: 50  (matches the N50 reconstructed image sets)
 #   DETECTION_INSTALL_ULTRALYTICS=1  to pip install ultralytics on the node
 
 set -euo pipefail
@@ -44,6 +45,7 @@ PROMPTS="${OPENVOCAB_PROMPTS:-vehicle building}"
 MODEL="${OPENVOCAB_MODEL:-yolov8x-worldv2.pt}"
 CONF="${OPENVOCAB_CONF:-0.02}"
 IMGSZ="${OPENVOCAB_IMGSZ:-1280}"
+MAX_IMAGES="${OPENVOCAB_MAX_IMAGES:-50}"
 
 RUN_ROOT="${OUT_BASE}/10_openvocab_detection_veh_bldg"
 GT_DIR="${RUN_ROOT}/gt_vehicle_building"
@@ -55,10 +57,15 @@ if [[ "${DETECTION_INSTALL_ULTRALYTICS:-0}" == "1" ]]; then
 fi
 
 echo "== Step 1: build 2-class ground truth (vehicle=0, building=1) =="
+GT_ARGS=()
+if [[ -n "${MAX_IMAGES}" ]]; then
+  GT_ARGS+=(--max_images "${MAX_IMAGES}")
+fi
 python experiments/compression/build_detection_gt_vehicle_building.py \
   --vehicle_dir "${VEHICLE_DIR}" \
   --building_dir "${BUILDING_DIR}" \
-  --output_dir "${GT_DIR}"
+  --output_dir "${GT_DIR}" \
+  "${GT_ARGS[@]}"
 
 echo "== Step 2: run open-vocab detection on each image set =="
 PRED_ARGS=()

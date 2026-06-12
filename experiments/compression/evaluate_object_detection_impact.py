@@ -27,6 +27,7 @@ from typing import Iterable
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 DEFAULT_IOU_THRESHOLDS = [round(0.5 + 0.05 * i, 2) for i in range(10)]
+ROBOFLOW_SUFFIX = re.compile(r"_JPG\.rf\.[0-9a-fA-F]+$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,7 @@ def parse_class_mapping(value: str) -> tuple[int, int]:
 
 
 def normalize_image_id(stem: str) -> str:
-    cleaned = stem
+    cleaned = ROBOFLOW_SUFFIX.sub("", stem)
     patterns = [
         r"_tile\d+_stitched$",
         r"_tile\d+_recon$",
