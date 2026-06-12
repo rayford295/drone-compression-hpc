@@ -118,3 +118,28 @@ sits beside the detection metrics.
 Experiment details (detector choice confirmation, prompt set, per-size bins, plot set)
 will be reviewed together before the HPC run. This document is the agreed design;
 implementation has not started.
+
+## Implementation & how to run on DeltaAI (added 2026-06-11)
+
+Scripts (all under `experiments/compression/`):
+
+- `build_detection_gt_vehicle_building.py` — merges `data/detection_labels/{vehicle,building}/labels` into a 2-class GT (vehicle=0, building=1), normalizing Roboflow filenames to source-image stems.
+- `run_open_vocab_detection.py` — runs YOLO-World with text prompts (`vehicle`, `building`) over an image folder and writes YOLO-format predictions (`class cx cy w h conf`).
+- `slurm/10_openvocab_detection_veh_bldg.sbatch` — wires GT build → open-vocab detection on each image set → `evaluate_object_detection_impact.py` (per-class + overall mAP@0.5, mAP@0.5:0.95, P, R, F1).
+
+Run (after the CDC reconstructions for the 50 images exist on scratch):
+
+```bash
+cd /projects/bfod/$USER/cdc-deltaai/code_main
+RUN_STAMP=YYYYMMDD_ovdet_veh_bldg_n50 \
+DETECTION_INSTALL_ULTRALYTICS=1 \
+OPENVOCAB_MODEL=yolov8x-worldv2.pt \
+OPENVOCAB_PROMPTS="vehicle building" \
+OPENVOCAB_CONF=0.02 \
+OPENVOCAB_IMGSZ=1280 \
+OPENVOCAB_IMAGE_SETS="original=/path/to/original high_quality_512=/path/to/hq512 balanced_256=/path/to/bal256 max_compression_256=/path/to/max256" \
+sbatch --export=ALL,REPO_DIR=$PWD \
+  experiments/compression/slurm/10_openvocab_detection_veh_bldg.sbatch
+```
+
+Sanity gate: run with only `OPENVOCAB_IMAGE_SETS="original=/path/to/original"` first and check `detection_per_class.csv` — if YOLO-World cannot detect vehicles/buildings on the originals (near-zero AP), switch the detector (GroundingDINO) or fall back to training a 2-class YOLO before scoring the compressed sets.
