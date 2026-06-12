@@ -21,6 +21,7 @@ Large raw outputs, full-resolution reconstructed PNGs, logs, model weights, and 
 | `2026-06-06-detection-coco-vehicle-n8/` | 2026-06-06 detection pilot | Yifan | DeltaAI GH200 COCO YOLOv8x vehicle-detection pilot comparing original, balanced, and maximum-compression reconstructions |
 | `2026-06-06-detection-coco-vehicle-n50/` | 2026-06-06 detection pilot | Yifan | DeltaAI GH200 N50 COCO YOLOv8x vehicle-detection pilot comparing original, high-quality, balanced, and maximum-compression reconstructions |
 | `2026-06-06-sam-mask-impact-n50/` | 2026-06-06 zero-shot segmentation pilot | Yifan | DeltaAI GH200 N50 Meta SAM mask-stability pilot comparing original, balanced, and maximum-compression reconstructions |
+| `2026-06-12-openvocab-prompt-sweep/` | 2026-06-12 Experiment 4b model gate | Yifan | DeltaAI GH200 YOLO-World prompt sweep showing vehicle detection works but open-vocabulary building detection is not suitable for the final compression-impact table |
 
 ## Hardware Scope
 

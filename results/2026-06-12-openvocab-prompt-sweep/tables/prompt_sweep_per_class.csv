@@ -1,0 +1,23 @@
+run_stamp,prompt_pair,conf,configuration,class_id,class_name,num_gt,num_predictions,ap50,precision50,recall50,f1_50
+20260612_ovdet_veh_bldg_n50_original_gate_retry1,vehicle building,0.02,original,0,vehicle,1013,1144,0.835927,0.770979,0.870681,0.817803
+20260612_ovdet_veh_bldg_n50_original_gate_retry1,vehicle building,0.02,original,1,building,1201,61,0.021027,0.606557,0.030808,0.058637
+20260612_ovdet_prompt_roof_conf002_n50,vehicle roof,0.02,original,0,vehicle,1013,1147,0.831419,0.766347,0.86772,0.813889
+20260612_ovdet_prompt_roof_conf002_n50,vehicle roof,0.02,original,1,building,1201,17,0.000056,0.058824,0.000833,0.001642
+20260612_ovdet_prompt_rooftop_conf002_n50,vehicle rooftop,0.02,original,0,vehicle,1013,1146,0.832775,0.767016,0.86772,0.814266
+20260612_ovdet_prompt_rooftop_conf002_n50,vehicle rooftop,0.02,original,1,building,1201,1,0.0,0.0,0.0,0.0
+20260612_ovdet_prompt_house_conf002_n50,vehicle house,0.02,original,0,vehicle,1013,1152,0.835149,0.765625,0.870681,0.814781
+20260612_ovdet_prompt_house_conf002_n50,vehicle house,0.02,original,1,building,1201,8,0.0,0.0,0.0,0.0
+20260612_ovdet_prompt_structure_conf002_n50,vehicle structure,0.02,original,0,vehicle,1013,1158,0.835584,0.761658,0.870681,0.812529
+20260612_ovdet_prompt_structure_conf002_n50,vehicle structure,0.02,original,1,building,1201,0,0.0,0.0,0.0,0.0
+20260612_ovdet_prompt_warehouse_conf002_n50,vehicle warehouse,0.02,original,0,vehicle,1013,1153,0.833798,0.762359,0.86772,0.811634
+20260612_ovdet_prompt_warehouse_conf002_n50,vehicle warehouse,0.02,original,1,building,1201,1,0.000833,1.0,0.000833,0.001664
+20260612_ovdet_prompt_roof_conf0005_n50,vehicle roof,0.005,original,0,vehicle,1013,2059,0.874663,0.459446,0.93386,0.615885
+20260612_ovdet_prompt_roof_conf0005_n50,vehicle roof,0.005,original,1,building,1201,159,0.000929,0.081761,0.010824,0.019118
+20260612_ovdet_prompt_rooftop_conf0005_n50,vehicle rooftop,0.005,original,0,vehicle,1013,2004,0.878493,0.473553,0.936821,0.629102
+20260612_ovdet_prompt_rooftop_conf0005_n50,vehicle rooftop,0.005,original,1,building,1201,96,0.006916,0.260417,0.020816,0.038551
+20260612_ovdet_prompt_house_conf0005_n50,vehicle house,0.005,original,0,vehicle,1013,1962,0.876612,0.482161,0.93386,0.635966
+20260612_ovdet_prompt_house_conf0005_n50,vehicle house,0.005,original,1,building,1201,164,0.00313,0.146341,0.019983,0.035165
+20260612_ovdet_prompt_structure_conf0005_n50,vehicle structure,0.005,original,0,vehicle,1013,1984,0.877729,0.477823,0.935834,0.632633
+20260612_ovdet_prompt_structure_conf0005_n50,vehicle structure,0.005,original,1,building,1201,0,0.0,0.0,0.0,0.0
+20260612_ovdet_prompt_warehouse_conf0005_n50,vehicle warehouse,0.005,original,0,vehicle,1013,1978,0.876954,0.478261,0.93386,0.632564
+20260612_ovdet_prompt_warehouse_conf0005_n50,vehicle warehouse,0.005,original,1,building,1201,10,0.005222,0.7,0.005828,0.011561

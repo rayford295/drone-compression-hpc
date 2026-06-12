@@ -191,3 +191,20 @@ sbatch --export=ALL,REPO_DIR=$PWD \
 
 Paper deliverable = the detection comparison table above **+** the SAM mask-stability
 table, across the four compression operating points.
+
+## YOLO-World sanity gate outcome (added 2026-06-12)
+
+The first original-image N50 gate and prompt sweep showed that YOLO-World is not suitable
+as the final detector for the two-class vehicle/building compression-impact table.
+
+- `vehicle building` worked for vehicles (`vehicle AP@0.5 = 0.835927`) but failed for
+  buildings (`building AP@0.5 = 0.021027`, `building recall = 0.030808`).
+- Alternative building prompts (`roof`, `rooftop`, `house`, `structure`, `warehouse`) at
+  confidence thresholds `0.02` and `0.005` did not recover building AP.
+- The best building sweep row was `vehicle rooftop` at confidence `0.005`, with
+  `building AP@0.5 = 0.006916` and `building recall = 0.020816`.
+
+Decision: use the YOLO-World runs as a model-selection gate, not as final compression
+evidence. The next recommended detector is a supervised two-class YOLO model trained on
+the human labels, using images `100_0005_0051` to `100_0005_0100` for training/validation
+and images `100_0005_0001` to `100_0005_0050` as the fixed test split.

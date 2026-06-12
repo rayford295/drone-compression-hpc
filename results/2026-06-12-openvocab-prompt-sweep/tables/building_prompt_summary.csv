@@ -1,0 +1,12 @@
+run_stamp,prompt_pair,conf,num_gt,num_predictions,ap50,precision50,recall50,f1_50,decision_note
+20260612_ovdet_veh_bldg_n50_original_gate_retry1,vehicle building,0.02,1201,61,0.021027,0.606557,0.030808,0.058637,baseline building prompt fails on top-down buildings
+20260612_ovdet_prompt_roof_conf002_n50,vehicle roof,0.02,1201,17,0.000056,0.058824,0.000833,0.001642,not usable
+20260612_ovdet_prompt_rooftop_conf002_n50,vehicle rooftop,0.02,1201,1,0.0,0.0,0.0,0.0,not usable
+20260612_ovdet_prompt_house_conf002_n50,vehicle house,0.02,1201,8,0.0,0.0,0.0,0.0,not usable
+20260612_ovdet_prompt_structure_conf002_n50,vehicle structure,0.02,1201,0,0.0,0.0,0.0,0.0,not usable
+20260612_ovdet_prompt_warehouse_conf002_n50,vehicle warehouse,0.02,1201,1,0.000833,1.0,0.000833,0.001664,not usable
+20260612_ovdet_prompt_roof_conf0005_n50,vehicle roof,0.005,1201,159,0.000929,0.081761,0.010824,0.019118,not usable
+20260612_ovdet_prompt_rooftop_conf0005_n50,vehicle rooftop,0.005,1201,96,0.006916,0.260417,0.020816,0.038551,best sweep row but worse than baseline building AP
+20260612_ovdet_prompt_house_conf0005_n50,vehicle house,0.005,1201,164,0.00313,0.146341,0.019983,0.035165,not usable
+20260612_ovdet_prompt_structure_conf0005_n50,vehicle structure,0.005,1201,0,0.0,0.0,0.0,0.0,not usable
+20260612_ovdet_prompt_warehouse_conf0005_n50,vehicle warehouse,0.005,1201,10,0.005222,0.7,0.005828,0.011561,not usable
