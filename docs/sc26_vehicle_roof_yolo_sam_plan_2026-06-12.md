@@ -95,10 +95,21 @@ sbatch --export=ALL,REPO_DIR=$PWD \
   experiments/compression/slurm/08_object_detection_impact.sbatch
 ```
 
-This gives the vehicle table:
+Full N50 run completed on 2026-06-12. The lightweight result package is
+`results/2026-06-12-yolo-vehicle-human-n50/`. The final operating point uses
+`conf=0.25`, selected from a confidence sweep because it is the YOLO default and gives
+the best F1 among the tested thresholds.
 
 | Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | GT | Predictions |
 |---------------|--------:|-------------:|----------:|-------:|---:|---:|------------:|
+| original | 0.697209 | 0.366182 | 0.682184 | 0.752221 | 0.715493 | 1013 | 1117 |
+| high_quality_512 | 0.622906 | 0.208523 | 0.637184 | 0.696940 | 0.665724 | 1013 | 1108 |
+| balanced_256 | 0.605004 | 0.201938 | 0.654545 | 0.675222 | 0.664723 | 1013 | 1045 |
+| max_compression_256 | 0.531950 | 0.175555 | 0.639035 | 0.601185 | 0.619532 | 1013 | 953 |
+
+Interpretation: `balanced_256` is close to `high_quality_512` in F1, while
+`max_compression_256` causes a larger recall and mAP drop. Use these as vehicle
+object-detection metrics, not classification metrics.
 
 ## Track B — Vehicle + Roof Supervised YOLO
 
