@@ -143,3 +143,44 @@ sbatch --export=ALL,REPO_DIR=$PWD \
 ```
 
 Sanity gate: run with only `OPENVOCAB_IMAGE_SETS="original=/path/to/original"` first and check `detection_per_class.csv` — if YOLO-World cannot detect vehicles/buildings on the originals (near-zero AP), switch the detector (GroundingDINO) or fall back to training a 2-class YOLO before scoring the compressed sets.
+
+## Task framing (paper) — detection, not classification (clarified 2026-06-11)
+
+This is an **object-detection** study, mirroring the existing Experiment 4 / SAM tables.
+There is **no image-classification task**. We measure how CDC compression degrades
+*detection* of real-world objects across compression operating points, with two
+detection **categories** (vehicle, building) reported the way COCO reports per-category AP.
+
+**Headline detection table (one row per configuration)** — identical columns to the
+existing Experiment 4 result table:
+
+| Configuration | mAP@0.5 | mAP@0.5:0.95 | Precision | Recall | F1 | GT boxes | Predictions |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Original | … | … | … | … | … | … | … |
+| High quality 512 | … | … | … | … | … | … | … |
+| Balanced 256 | … | … | … | … | … | … | … |
+| Max compression 256 | … | … | … | … | … | … | … |
+
+`detection_summary.csv` already has exactly these fields (`map50`, `map50_95`,
+`precision50`, `recall50`, `f1_50`, `num_gt`, `num_predictions`). `detection_per_class.csv`
+adds the per-category (vehicle vs building) split — supplementary detection detail that
+supports the small-object-sensitivity argument, not a separate classification metric.
+
+## SAM mask-stability add-on (same human labels)
+
+To reproduce the second table (zero-shot segmentation stability) on the human labels,
+reuse the existing SAM evaluator with the 2-class GT boxes built by Step 1 as prompts:
+
+```bash
+RUN_STAMP=YYYYMMDD_sam_veh_bldg_n50 \
+SAM_CHECKPOINT=/projects/bfod/$USER/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth \
+SAM_MODEL_TYPE=vit_h \
+SAM_PROMPT_LABEL_DIR=/projects/bfod/$USER/cdc-deltaai/output/.../10_openvocab_detection_veh_bldg/gt_vehicle_building \
+SAM_IMAGE_SETS="original=/path/to/original balanced_256=/path/to/bal256 balanced_512=/path/to/hq512 max_compression_256=/path/to/max256" \
+SAM_PROMPT_BATCH_SIZE=4 \
+sbatch --export=ALL,REPO_DIR=$PWD \
+  experiments/compression/slurm/09_sam_mask_impact.sbatch
+```
+
+Paper deliverable = the detection comparison table above **+** the SAM mask-stability
+table, across the four compression operating points.
