@@ -24,7 +24,7 @@
 #   OPENVOCAB_CONF          default: 0.02
 #   OPENVOCAB_IMGSZ         default: 1280
 #   OPENVOCAB_MAX_IMAGES    default: 50  (matches the N50 reconstructed image sets)
-#   DETECTION_INSTALL_ULTRALYTICS=1  to pip install ultralytics on the node
+#   DETECTION_INSTALL_ULTRALYTICS=1  to pip install ultralytics and YOLO-World text deps on the node
 
 set -euo pipefail
 
@@ -54,6 +54,8 @@ mkdir -p "${RUN_ROOT}" "${PRED_ROOT}"
 
 if [[ "${DETECTION_INSTALL_ULTRALYTICS:-0}" == "1" ]]; then
   python -m pip install --user ultralytics --quiet
+  python -c "import clip" >/dev/null 2>&1 || \
+    python -m pip install --user ftfy regex tqdm git+https://github.com/openai/CLIP.git --quiet
 fi
 
 echo "== Step 1: build 2-class ground truth (vehicle=0, building=1) =="

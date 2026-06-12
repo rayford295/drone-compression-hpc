@@ -124,7 +124,7 @@ implementation has not started.
 Scripts (all under `experiments/compression/`):
 
 - `build_detection_gt_vehicle_building.py` — merges `data/detection_labels/{vehicle,building}/labels` into a 2-class GT (vehicle=0, building=1), normalizing Roboflow filenames to source-image stems.
-- `run_open_vocab_detection.py` — runs YOLO-World with text prompts (`vehicle`, `building`) over an image folder and writes YOLO-format predictions (`class cx cy w h conf`).
+- `run_open_vocab_detection.py` — runs YOLO-World with text prompts (`vehicle`, `building`) over an image folder and writes YOLO-format predictions (`class cx cy w h conf`). YOLO-World requires the OpenAI `clip` package for text embeddings; the Slurm wrapper checks/installs it when `DETECTION_INSTALL_ULTRALYTICS=1`.
 - `slurm/10_openvocab_detection_veh_bldg.sbatch` — wires GT build → open-vocab detection on each image set → `evaluate_object_detection_impact.py` (per-class + overall mAP@0.5, mAP@0.5:0.95, P, R, F1).
 
 Run (after the CDC reconstructions for the 50 images exist on scratch):
