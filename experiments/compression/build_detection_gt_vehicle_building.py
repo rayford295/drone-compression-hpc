@@ -63,6 +63,13 @@ def main() -> None:
     parser.add_argument("--vehicle_class", type=int, default=0)
     parser.add_argument("--building_class", type=int, default=1)
     parser.add_argument(
+        "--classes",
+        nargs="+",
+        choices=["vehicle", "building"],
+        default=["vehicle", "building"],
+        help="Classes to include in the output. Use --classes vehicle for vehicle-only GT or --classes building --building_class 0 for roof-only GT.",
+    )
+    parser.add_argument(
         "--max_images",
         type=int,
         default=0,
@@ -72,8 +79,16 @@ def main() -> None:
                         help="Keep the Roboflow hashed filenames instead of normalizing to the source-image stem.")
     args = parser.parse_args()
 
-    veh = collect(pathlib.Path(args.vehicle_dir).expanduser(), args.vehicle_class, args.keep_hashed_names)
-    bld = collect(pathlib.Path(args.building_dir).expanduser(), args.building_class, args.keep_hashed_names)
+    veh = (
+        collect(pathlib.Path(args.vehicle_dir).expanduser(), args.vehicle_class, args.keep_hashed_names)
+        if "vehicle" in args.classes
+        else {}
+    )
+    bld = (
+        collect(pathlib.Path(args.building_dir).expanduser(), args.building_class, args.keep_hashed_names)
+        if "building" in args.classes
+        else {}
+    )
 
     out = pathlib.Path(args.output_dir).expanduser()
     out.mkdir(parents=True, exist_ok=True)
@@ -94,12 +109,15 @@ def main() -> None:
             images_with_both += 1
 
     print(f"Wrote {len(stems)} merged GT files to {out}")
-    print(f"  vehicle (class {args.vehicle_class}) boxes : {veh_boxes}")
-    print(f"  building (class {args.building_class}) boxes: {bld_boxes}")
-    print(f"  images with both classes               : {images_with_both}")
-    print(f"  images vehicle-only / building-only     : "
-          f"{sum(1 for s in stems if veh.get(s) and not bld.get(s))} / "
-          f"{sum(1 for s in stems if bld.get(s) and not veh.get(s))}")
+    if "vehicle" in args.classes:
+        print(f"  vehicle (class {args.vehicle_class}) boxes : {veh_boxes}")
+    if "building" in args.classes:
+        print(f"  building/roof (class {args.building_class}) boxes: {bld_boxes}")
+    if "vehicle" in args.classes and "building" in args.classes:
+        print(f"  images with both classes               : {images_with_both}")
+        print(f"  images vehicle-only / building-only     : "
+              f"{sum(1 for s in stems if veh.get(s) and not bld.get(s))} / "
+              f"{sum(1 for s in stems if bld.get(s) and not veh.get(s))}")
 
 
 if __name__ == "__main__":

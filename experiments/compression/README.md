@@ -19,6 +19,7 @@ This folder contains the runnable experiment scaffold for the next compression m
 | Practical compression x tile-size tradeoff | `slurm/07_compression_tile_tradeoff.sbatch` |
 | Downstream object-detection impact | `evaluate_object_detection_impact.py`, `slurm/08_object_detection_impact.sbatch` |
 | SAM zero-shot mask-stability impact | `evaluate_sam_mask_impact.py`, `slurm/09_sam_mask_impact.sbatch` |
+| Supervised vehicle + roof YOLO training | `prepare_yolo_vehicle_roof_dataset.py`, `slurm/11_train_yolo_vehicle_roof.sbatch` |
 | Jacob compression-side suite, no tiling | `slurm/run_jacob_compression_suite.sh` |
 | Combined tables | `summarize_results.py` |
 | Poster-ready visual panels | `make_poster_panels.py` |
