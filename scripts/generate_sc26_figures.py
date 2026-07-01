@@ -27,20 +27,24 @@ SAM_ROOF = REPO / "results/2026-06-12-sam-vehicle-roof-human-n50/tables/sam_roof
 
 
 COLORS = {
-    "bg": "#EAF7FA",
-    "panel": "#F8FBFD",
-    "ink": "#172033",
-    "muted": "#5B667A",
-    "grid": "#CFD9E6",
-    "navy": "#0B1B32",
-    "teal": "#63C7C3",
-    "teal_dark": "#168B87",
-    "coral": "#FA7A7D",
-    "coral_dark": "#C54247",
-    "blue": "#4C78A8",
-    "green": "#59A96A",
-    "yellow": "#F4D35E",
-    "orange": "#F58518",
+    "bg": "#FFFFFF",
+    "panel": "#FFFDF8",
+    "panel_alt": "#F7EEE8",
+    "ink": "#231F20",
+    "muted": "#5D514D",
+    "grid": "#DCCFC6",
+    "border": "#C8B8AB",
+    "navy": "#500000",
+    "maroon": "#500000",
+    "maroon_dark": "#350000",
+    "teal": "#5E8B83",
+    "teal_dark": "#3F6F67",
+    "coral": "#9B1743",
+    "coral_dark": "#6C0F22",
+    "blue": "#6E7781",
+    "green": "#7B9A6E",
+    "yellow": "#E4C15A",
+    "orange": "#B45F2A",
     "white": "#FFFFFF",
 }
 
@@ -101,9 +105,10 @@ def fnum(value: str | float | int) -> float:
 def image(width: int, height: int, title: str, subtitle: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     img = Image.new("RGB", (width, height), color(COLORS["bg"]))
     draw = ImageDraw.Draw(img)
-    draw.rectangle((0, 0, width, 12), fill=color("#63D3DD"))
-    draw.text((55, 55), title, font=FONTS["title"], fill=color(COLORS["ink"]))
+    draw.rectangle((0, 0, width, 16), fill=color(COLORS["maroon"]))
+    draw.text((55, 54), title, font=FONTS["title"], fill=color(COLORS["maroon_dark"]))
     draw.text((58, 126), subtitle, font=FONTS["body"], fill=color(COLORS["muted"]))
+    draw.line((55, 172, width - 55, 172), fill=color(COLORS["maroon"]), width=4)
     return img, draw
 
 
@@ -158,8 +163,16 @@ def multiline(
 
 def panel(draw: ImageDraw.ImageDraw, xywh: tuple[int, int, int, int], title: str) -> tuple[int, int, int, int]:
     x, y, w, h = xywh
-    draw.rounded_rectangle((x, y, x + w, y + h), radius=12, fill=color(COLORS["panel"]), outline=color("#D9E2ED"), width=2)
-    draw.text((x + 24, y + 18), title, font=FONTS["h2"], fill=color(COLORS["ink"]))
+    draw.rounded_rectangle(
+        (x, y, x + w, y + h),
+        radius=8,
+        fill=color(COLORS["panel"]),
+        outline=color(COLORS["border"]),
+        width=2,
+    )
+    draw.rectangle((x, y, x + w, y + 8), fill=color(COLORS["maroon"]))
+    draw.text((x + 24, y + 22), title, font=FONTS["h2"], fill=color(COLORS["maroon_dark"]))
+    draw.line((x + 24, y + 60, x + w - 24, y + 60), fill=color(COLORS["grid"]), width=2)
     return x + 28, y + 70, w - 56, h - 98
 
 
@@ -180,7 +193,7 @@ def draw_bar_chart(
     lower_is_better: bool = True,
 ) -> None:
     x, y, w, h = rect
-    plot_left, plot_top = x + 70, y + 16
+    plot_left, plot_top = x + 70, y + 34
     plot_right, plot_bottom = x + w - 20, y + h - 86
     ymax = ymax or max(values) * 1.18
     if ymax <= 1.2:
@@ -194,14 +207,14 @@ def draw_bar_chart(
         draw.line((plot_left, gy, plot_right, gy), fill=color(COLORS["grid"]), width=1)
         tick = ymax * i / 4
         draw.text((x + 8, gy - 10), tick_fmt.format(tick), font=FONTS["tiny"], fill=color(COLORS["muted"]))
-    draw.line((plot_left, plot_bottom, plot_right, plot_bottom), fill=color(COLORS["muted"]), width=2)
+    draw.line((plot_left, plot_bottom, plot_right, plot_bottom), fill=color(COLORS["ink"]), width=2)
     n = len(values)
     slot = (plot_right - plot_left) / n
     for i, (label, value) in enumerate(zip(labels, values)):
         bw = slot * 0.58
         bx = plot_left + i * slot + (slot - bw) / 2
         by = plot_bottom - (plot_bottom - plot_top) * value / ymax
-        draw.rounded_rectangle((bx, by, bx + bw, plot_bottom), radius=5, fill=color(bar_colors[i]), outline=color("#314155"), width=2)
+        draw.rounded_rectangle((bx, by, bx + bw, plot_bottom), radius=4, fill=color(bar_colors[i]), outline=color(COLORS["ink"]), width=2)
         value_text = f"{fmt.format(value)}{unit}"
         tw, _ = text_size(draw, value_text, FONTS["small_bold"])
         draw.text((bx + bw / 2 - tw / 2, by - 28), value_text, font=FONTS["small_bold"], fill=color(COLORS["ink"]))
@@ -209,7 +222,8 @@ def draw_bar_chart(
             lw, _ = text_size(draw, line, FONTS["tiny"])
             draw.text((bx + bw / 2 - lw / 2, plot_bottom + 14 + li * 20), line, font=FONTS["tiny"], fill=color(COLORS["muted"]))
     note = "lower is better" if lower_is_better else "higher is better"
-    draw.text((plot_right - 145, plot_top - 8), note, font=FONTS["tiny"], fill=color(COLORS["muted"]))
+    note_w, _ = text_size(draw, note, FONTS["tiny"])
+    draw.text((plot_right - note_w, y + 4), note, font=FONTS["tiny"], fill=color(COLORS["muted"]))
 
 
 def draw_grouped_bars(
@@ -223,7 +237,7 @@ def draw_grouped_bars(
     fmt: str = "{:.1f}",
 ) -> None:
     x, y, w, h = rect
-    plot_left, plot_top = x + 72, y + 20
+    plot_left, plot_top = x + 72, y + 54
     plot_right, plot_bottom = x + w - 28, y + h - 82
     ymax = ymax or max(max(vals) for _, vals, _ in series) * 1.18
     for i in range(5):
@@ -231,7 +245,7 @@ def draw_grouped_bars(
         draw.line((plot_left, gy, plot_right, gy), fill=color(COLORS["grid"]), width=1)
         tick = ymax * i / 4
         draw.text((x + 8, gy - 10), f"{tick:.0f}", font=FONTS["tiny"], fill=color(COLORS["muted"]))
-    draw.line((plot_left, plot_bottom, plot_right, plot_bottom), fill=color(COLORS["muted"]), width=2)
+    draw.line((plot_left, plot_bottom, plot_right, plot_bottom), fill=color(COLORS["ink"]), width=2)
     n = len(labels)
     slot = (plot_right - plot_left) / n
     bar_w = slot * 0.58 / len(series)
@@ -241,7 +255,7 @@ def draw_grouped_bars(
             value = vals[i]
             bx = group_x + si * bar_w
             by = plot_bottom - (plot_bottom - plot_top) * value / ymax
-            draw.rectangle((bx, by, bx + bar_w * 0.86, plot_bottom), fill=color(c), outline=color("#314155"), width=1)
+            draw.rectangle((bx, by, bx + bar_w * 0.86, plot_bottom), fill=color(c), outline=color(COLORS["ink"]), width=1)
             if i == n - 1 or len(labels) <= 4:
                 txt = f"{fmt.format(value)}{unit}"
                 tw, _ = text_size(draw, txt, FONTS["tiny"])
@@ -250,9 +264,10 @@ def draw_grouped_bars(
             lw, _ = text_size(draw, line, FONTS["tiny"])
             draw.text((plot_left + i * slot + slot / 2 - lw / 2, plot_bottom + 14 + li * 20), line, font=FONTS["tiny"], fill=color(COLORS["muted"]))
     lx = plot_left
+    legend_y = y + 8
     for name, _, c in series:
-        draw.rectangle((lx, plot_top - 10, lx + 20, plot_top + 10), fill=color(c), outline=color("#314155"))
-        draw.text((lx + 28, plot_top - 14), name, font=FONTS["tiny"], fill=color(COLORS["muted"]))
+        draw.rectangle((lx, legend_y, lx + 20, legend_y + 20), fill=color(c), outline=color(COLORS["ink"]))
+        draw.text((lx + 28, legend_y - 2), name, font=FONTS["tiny"], fill=color(COLORS["muted"]))
         lx += 148
 
 
@@ -264,8 +279,8 @@ def blend(c1: str, c2: str, t: float) -> tuple[int, int, int]:
 def heat_color(value: float, high_good: bool) -> tuple[int, int, int]:
     v = max(0.0, min(1.0, value))
     if high_good:
-        return blend("#FBEA8A", COLORS["green"], v)
-    return blend(COLORS["green"], COLORS["coral"], v)
+        return blend("#F1DDE4", COLORS["green"], v)
+    return blend(COLORS["green"], "#C96A70", v)
 
 
 def draw_heatmap(
@@ -338,7 +353,7 @@ def render_platform_table() -> Path:
         "What can be drawn from rayford295/sc26-cdc-deltaai today, using committed result summaries.",
     )
     x, y, w, h = 70, 210, 1660, 650
-    draw.rounded_rectangle((x, y, x + w, y + h), radius=12, fill=color(COLORS["panel"]), outline=color("#B7C6D8"), width=3)
+    draw.rounded_rectangle((x, y, x + w, y + h), radius=8, fill=color(COLORS["panel"]), outline=color(COLORS["border"]), width=3)
     headers = ["Evidence lane", "DeltaAI GH200", "Delta H200", "Not measured in repo"]
     col_w = [300, 470, 430, 460]
     rows = [
@@ -371,15 +386,15 @@ def render_platform_table() -> Path:
     cursor_y = y
     cursor_x = x
     for i, header in enumerate(headers):
-        draw.rectangle((cursor_x, cursor_y, cursor_x + col_w[i], cursor_y + row_h[0]), fill=color(COLORS["navy"]), outline=color("#B7C6D8"))
+        draw.rectangle((cursor_x, cursor_y, cursor_x + col_w[i], cursor_y + row_h[0]), fill=color(COLORS["navy"]), outline=color(COLORS["border"]))
         center_text(draw, (cursor_x, cursor_y, cursor_x + col_w[i], cursor_y + row_h[0]), header, FONTS["body_bold"], COLORS["white"])
         cursor_x += col_w[i]
     cursor_y += row_h[0]
     for ri, row in enumerate(rows):
         cursor_x = x
-        fill = "#FFFFFF" if ri % 2 == 0 else "#F1F7FA"
+        fill = "#FFFFFF" if ri % 2 == 0 else COLORS["panel_alt"]
         for ci, cell in enumerate(row):
-            draw.rectangle((cursor_x, cursor_y, cursor_x + col_w[ci], cursor_y + row_h[ri + 1]), fill=color(fill), outline=color("#B7C6D8"))
+            draw.rectangle((cursor_x, cursor_y, cursor_x + col_w[ci], cursor_y + row_h[ri + 1]), fill=color(fill), outline=color(COLORS["border"]))
             fnt = FONTS["body_bold"] if ci == 0 else FONTS["small"]
             multiline(draw, (cursor_x + 18, cursor_y + 20), cell, fnt, COLORS["ink"] if ci == 0 else COLORS["muted"], col_w[ci] - 36, 6)
             cursor_x += col_w[ci]
@@ -401,7 +416,7 @@ def render_performance_dashboard() -> Path:
         width,
         height,
         "CDC Reconstruction Performance Dashboard",
-        "Measured DeltaAI GH200 results from the formal N50 compression-setting x tile-size run.",
+        "Measured DeltaAI GH200 results from the N50 compression-setting x tile-size run.",
     )
     p1 = panel(draw, (60, 200, 860, 450), "Runtime per Image")
     draw_bar_chart(
@@ -460,7 +475,7 @@ def render_performance_dashboard() -> Path:
         fmt="{:.3f}",
         lower_is_better=False,
     )
-    draw.text((p4[0] + 502, p4[1] + 15), "YOLO vehicle+roof, conf=0.25", font=FONTS["tiny"], fill=color(COLORS["muted"]))
+    draw.text((p4[0] + 12, p4[1] + 4), "Metric: YOLO vehicle+roof mAP@0.5, conf=0.25", font=FONTS["tiny"], fill=color(COLORS["muted"]))
     source(draw, "Sources: results/2026-06-05-tradeoff-n50-lpips and results/2026-06-12-yolo-vehicle-roof-human-n50.", width, height)
     out = OUT_DIR / "sc26_cdc_performance_dashboard.png"
     img.save(out)
@@ -602,7 +617,7 @@ def render_bottleneck_proxy() -> Path:
         width,
         height,
         "Bottleneck Analysis from Available Metrics",
-        "Proxy heatmap from committed summaries. Hardware telemetry such as bandwidth, power, and temperature is not in the repo yet.",
+        "Proxy heatmap from committed summaries; hardware telemetry is labeled as a future instrumentation step.",
     )
     hm = panel(draw, (60, 200, 1780, 515), "Measured Proxies, Not Hardware Telemetry")
     draw_heatmap(draw, hm, rows, labels, texts)
