@@ -1,15 +1,15 @@
-# CDC Drone-Imagery Compression on GPU Supercomputers
+# Drone Imagery Compression on GPU Supercomputers
 
-This repository supports an SC26 poster study on high-resolution drone imagery,
-lossy compression, tiled diffusion reconstruction, and downstream inspection on
-GPU supercomputers.
+This repository studies high-resolution drone imagery compression as an HPC
+workflow. It evaluates conditional diffusion compression (CDC), tiled diffusion
+reconstruction, and downstream inspection on GPU supercomputers, with the final
+SC26 submission files archived under `sc26/`.
 
-The project does not propose a new compression algorithm. It evaluates an
-existing conditional diffusion compression (CDC) workflow as a data-centric HPC
-workload: raw drone imagery creates storage and transfer pressure, while
-diffusion reconstruction creates GPU-memory and throughput pressure. The main
-question is which operating point makes full-resolution drone imagery practical
-for repeated analysis on NCSA DeltaAI GH200.
+The project does not propose a new compression algorithm. Instead, it treats CDC
+as a data-centric HPC workload: raw drone imagery creates storage and transfer
+pressure, while diffusion reconstruction creates GPU-memory and throughput
+pressure. The main question is which operating point makes full-resolution drone
+imagery practical for repeated analysis on NCSA DeltaAI GH200.
 
 ## Key Finding
 
