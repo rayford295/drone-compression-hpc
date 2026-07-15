@@ -22,7 +22,7 @@ Reconstructed image preparation:
 | Run stamp | `20260606_tradeoff_n50_visuals_for_detection` |
 | Purpose | Save 50 reconstructed images for each tiled configuration |
 | Result | `6` summary rows, with `50` saved reconstructed images per `visuals/` directory |
-| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_tradeoff_n50_visuals_for_detection/07_compression_tile_tradeoff` |
+| Output root | `/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_tradeoff_n50_visuals_for_detection/07_compression_tile_tradeoff` |
 
 Detection evaluation:
 
@@ -36,9 +36,9 @@ Detection evaluation:
 | System | DeltaAI GH200 |
 | Detector | `yolov8x.pt` |
 | Detector source | COCO-pretrained Ultralytics YOLOv8x |
-| Ground truth | `/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft` |
-| Image set root | `/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff` |
-| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n50_retry1/08_object_detection_impact` |
+| Ground truth | `/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n50_draft` |
+| Image set root | `/projects/bfod/USERNAME/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff` |
+| Output root | `/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n50_retry1/08_object_detection_impact` |
 
 ## Inputs
 

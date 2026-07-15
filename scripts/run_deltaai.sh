@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cdc-epsilon-eval
-#SBATCH --account=bfod-dtai-gh
+#SBATCH --account=YOUR_ALLOCATION
 #SBATCH --partition=ghx4
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -11,7 +11,7 @@
 #SBATCH --output=logs/epsilon_eval_%j.out
 #SBATCH --error=logs/epsilon_eval_%j.err
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=yyang48@illinois.edu
+#SBATCH --mail-user=YOUR_EMAIL
 
 set -e
 
@@ -21,15 +21,15 @@ module load default
 module load gcc/14.2.0
 module load python/miniforge3_pytorch/2.10.0
 conda activate base
-export PYTHONPATH=/u/yyang48/.local/lib/python3.12/site-packages:$PYTHONPATH
+export PYTHONPATH=$HOME/.local/lib/python3.12/site-packages:$PYTHONPATH
 python -m pip install --user ema-pytorch lpips --quiet
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE=/projects/bfod/yyang48/cdc-deltaai
+BASE=/projects/bfod/$USER/cdc-deltaai
 CKPT_DIR=$BASE/weights/epsilon_param
 IMG_DIR=$BASE/data/imgs
 OUT_BASE=$BASE/output/epsilon_eval_${SLURM_JOB_ID}
-CODE_DIR=/u/yyang48/code/epsilonparam
+CODE_DIR=$HOME/code/epsilonparam
 
 mkdir -p $OUT_BASE logs
 

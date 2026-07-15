@@ -11,6 +11,8 @@ pressure, while diffusion reconstruction creates GPU-memory and throughput
 pressure. The main question is which operating point makes full-resolution drone
 imagery practical for repeated analysis on NCSA DeltaAI GH200.
 
+![Qualitative comparison of original and CDC-reconstructed drone imagery at 256 and 512 tile sizes](imgs/sc26_qualitative_256_512_visual_comparison.jpg)
+
 ## Key Finding
 
 For the current Galveston drone-image workload, the best operating point is:
@@ -32,6 +34,8 @@ Compared with full-image balanced reconstruction, balanced 256 tiling cuts peak
 GPU memory from about 52 GB to about 1.6 GB and reduces runtime from about
 143 seconds to about 79 seconds per image.
 
+![CDC performance dashboard: speed, memory, compression ratio, and quality across operating points](imgs/sc26_cdc_performance_dashboard.png)
+
 ## What Is in This Repository
 
 The repository contains code, runbooks, and GitHub-safe result summaries for a
@@ -44,18 +48,26 @@ measured systems study of CDC reconstruction on HPC hardware.
 | `imgs/` | Public-facing figure panels for posters and summaries. |
 | `paper/` | Manuscript and SC26 submission materials. |
 | `sc26/` | Final PDFs uploaded for the SC26 submission. |
-| `docs/` | Internal runbooks, dated plans, and archived project notes. |
 | `xparam/`, `epsilonparam/` | CDC-derived model code paths used by the experiments. |
 
 ## Public Figures
 
-Selected figure panels are available in `imgs/`:
+Selected figure panels from the SC26 submission are available in `imgs/`.
 
-- `sc26_cdc_performance_dashboard.png`
-- `sc26_gh200_h200_hardware_comparison.png`
-- `sc26_bottleneck_proxy_heatmap.png`
-- `sc26_qualitative_256_512_visual_comparison.png`
-- `sc26_compute_platform_evidence_scope.png`
+**GH200 vs H200 hardware comparison** — reconstruction throughput and memory
+behavior across the two GPU platforms:
+
+![GH200 vs H200 hardware comparison](imgs/sc26_gh200_h200_hardware_comparison.png)
+
+**Bottleneck proxy heatmap** — where time is spent across compression settings
+and tile sizes:
+
+![Bottleneck proxy heatmap](imgs/sc26_bottleneck_proxy_heatmap.png)
+
+**Compute platform evidence scope** — which claims are backed by measurements on
+which platform:
+
+![Compute platform evidence scope](imgs/sc26_compute_platform_evidence_scope.png)
 
 These figures are generated from committed result tables using:
 

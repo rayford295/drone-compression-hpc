@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=sc26_cdc_sam
-#SBATCH --account=bfod-dtai-gh
+#SBATCH --account=YOUR_ALLOCATION
 #SBATCH --partition=ghx4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

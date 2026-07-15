@@ -1,7 +1,7 @@
 ====================================================================
   CDC RECONSTRUCTION PROFILING REPORT
 ====================================================================
-  Checkpoint        : /projects/bfod/yyang48/cdc-deltaai/weights/x_param/image-l2-use_weight5-vimeo-d64-t8193-b0.2048-x-cosine-01-float32-aux0.9lpips_2.pt
+  Checkpoint        : /projects/bfod/USERNAME/cdc-deltaai/weights/x_param/image-l2-use_weight5-vimeo-d64-t8193-b0.2048-x-cosine-01-float32-aux0.9lpips_2.pt
   Images profiled   : 10
   Denoising steps   : 65
   Precision         : fp16

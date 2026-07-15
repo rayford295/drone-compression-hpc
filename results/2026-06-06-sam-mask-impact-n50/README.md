@@ -20,10 +20,10 @@ This is a promptable segmentation-stability result, not a class-aware detection-
 | Elapsed | `00:12:18` |
 | System | DeltaAI GH200 |
 | SAM model | Meta SAM ViT-H |
-| SAM checkpoint | `/projects/bfod/yyang48/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth` |
-| Prompt labels | `/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n50_draft` |
-| Image set root | `/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff` |
-| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_sam_vehicle_n50/09_sam_mask_impact` |
+| SAM checkpoint | `/projects/bfod/USERNAME/cdc-deltaai/weights/sam/sam_vit_h_4b8939.pth` |
+| Prompt labels | `/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n50_draft` |
+| Image set root | `/projects/bfod/USERNAME/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n50_tradeoff` |
+| Output root | `/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_sam_vehicle_n50/09_sam_mask_impact` |
 
 ## Inputs
 

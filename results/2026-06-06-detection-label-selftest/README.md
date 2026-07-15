@@ -21,13 +21,13 @@ This is not a formal object-detection impact result. The test uses the ground-tr
 | Batch MaxRSS | `51904K` |
 | GPU | `1 x NVIDIA GH200` |
 | Memory request | `64G` |
-| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_label_selftest/08_object_detection_impact` |
+| Output root | `/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_label_selftest/08_object_detection_impact` |
 
 ## Inputs
 
 ```text
-DETECTION_GT_DIR=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8
-DETECTION_PREDICTION_DIRS="self=/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8"
+DETECTION_GT_DIR=/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n8
+DETECTION_PREDICTION_DIRS="self=/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n8"
 ```
 
 The input label folder contains `8` image label files and `234` total draft vehicle boxes.

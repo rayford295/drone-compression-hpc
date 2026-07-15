@@ -3,7 +3,7 @@
 #SBATCH --job-name=d_eori     # Job name
 #SBATCH --gres=gpu:1             # how many gpus would you like to use (here I use 1)
 #SBATCH --mail-type=END,FAIL         # Mail events (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --mail-user=ruihan.yang@uci.edu  # Where to send mail	(for notification only)
+#SBATCH --mail-user=YOUR_EMAIL  # Where to send mail	(for notification only)
 #SBATCH --nodes=1                    # Run all processes on a single node
 #SBATCH --ntasks=1                   # Run a single task
 #SBATCH --cpus-per-task=5            # Number of CPU cores per task

@@ -19,9 +19,9 @@ This is a pilot result, not a publication-grade detection result. The detector i
 | System | DeltaAI GH200 |
 | Detector | `yolov8x.pt` |
 | Detector source | COCO-pretrained Ultralytics YOLOv8x |
-| Ground truth | `/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8` |
-| Image set root | `/projects/bfod/yyang48/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff` |
-| Output root | `/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact` |
+| Ground truth | `/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n8` |
+| Image set root | `/projects/bfod/USERNAME/cdc-deltaai/output/detection_image_sets/20260606_vehicle_n8_tradeoff` |
+| Output root | `/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact` |
 
 ## Inputs
 

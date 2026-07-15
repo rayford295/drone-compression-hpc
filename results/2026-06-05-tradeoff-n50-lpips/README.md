@@ -5,7 +5,7 @@ This folder records the formal DeltaAI GH200 compression-setting x tile-size tra
 ## Scope
 
 - System: DeltaAI GH200, partition `ghx4`
-- DeltaAI code checkout: `/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c`
+- DeltaAI code checkout: `/projects/bfod/USERNAME/cdc-deltaai/code_main_641d86c`
 - SLURM job: `2422336`
 - Run stamp: `20260605_tradeoff_n50_lpips`
 - Runtime: `13:15:48`
@@ -19,7 +19,7 @@ This folder records the formal DeltaAI GH200 compression-setting x tile-size tra
 The full raw run remains on DeltaAI:
 
 ```text
-/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/
+/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260605_tradeoff_n50_lpips/07_compression_tile_tradeoff/
 ```
 
 ## Files

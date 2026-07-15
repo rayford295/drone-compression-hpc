@@ -1,5 +1,5 @@
 {
-  "ground_truth_dir": "/projects/bfod/yyang48/cdc-deltaai/data/labels_yolo_vehicle_n8",
+  "ground_truth_dir": "/projects/bfod/USERNAME/cdc-deltaai/data/labels_yolo_vehicle_n8",
   "iou_thresholds": [
     0.5,
     0.55,
@@ -12,7 +12,7 @@
     0.9,
     0.95
   ],
-  "detector_model": "/projects/bfod/yyang48/cdc-deltaai/weights/detectors/yolov8x.pt",
+  "detector_model": "/projects/bfod/USERNAME/cdc-deltaai/weights/detectors/yolov8x.pt",
   "detector_classes": [
     2,
     5,
@@ -26,10 +26,10 @@
   "drop_unmapped_prediction_classes": true,
   "restrict_predictions_to_gt": true,
   "prediction_dirs": {
-    "original": "/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/original/labels",
-    "balanced_256": "/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/balanced_256/labels",
-    "balanced_512": "/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/balanced_512/labels",
-    "max_compression_256": "/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/max_compression_256/labels"
+    "original": "/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/original/labels",
+    "balanced_256": "/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/balanced_256/labels",
+    "balanced_512": "/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/balanced_512/labels",
+    "max_compression_256": "/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260606_detection_coco_vehicle_n8/08_object_detection_impact/ultralytics_runs/max_compression_256/labels"
   },
   "job_id": "2425670",
   "run_stamp": "20260606_detection_coco_vehicle_n8"

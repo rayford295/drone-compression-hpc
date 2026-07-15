@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cdc-xparam-eval
-#SBATCH --account=bfod-dtai-gh
+#SBATCH --account=YOUR_ALLOCATION
 #SBATCH --partition=ghx4
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -10,16 +10,16 @@
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/xparam_eval_%j.log
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=yyang48@illinois.edu
+#SBATCH --mail-user=YOUR_EMAIL
 
 set -e
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE=/projects/bfod/yyang48/cdc-deltaai
+BASE=/projects/bfod/$USER/cdc-deltaai
 CKPT_DIR=$BASE/weights/x_param
 IMG_DIR=$BASE/data/imgs
 OUT_BASE=$BASE/output/xparam_eval_${SLURM_JOB_ID}
-CODE_DIR=/u/yyang48/code/xparam
+CODE_DIR=$HOME/code/xparam
 
 # ── Environment ───────────────────────────────────────────────────────────────
 module purge
@@ -27,7 +27,7 @@ module load default
 module load gcc/14.2.0
 module load python/miniforge3_pytorch/2.10.0
 conda activate base
-export PYTHONPATH=/u/yyang48/.local/lib/python3.12/site-packages:$PYTHONPATH
+export PYTHONPATH=$HOME/.local/lib/python3.12/site-packages:$PYTHONPATH
 python -m pip install --user ema-pytorch lpips --quiet
 
 mkdir -p $OUT_BASE

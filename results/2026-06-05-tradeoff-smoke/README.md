@@ -17,7 +17,7 @@ This folder records the first DeltaAI GH200 smoke run for the combined compressi
 The full raw run remains on DeltaAI:
 
 ```text
-/projects/bfod/yyang48/cdc-deltaai/output/sc26_compression/20260605_tradeoff_smoke/07_compression_tile_tradeoff/
+/projects/bfod/USERNAME/cdc-deltaai/output/sc26_compression/20260605_tradeoff_smoke/07_compression_tile_tradeoff/
 ```
 
 ## Files
@@ -43,6 +43,6 @@ COMPUTE_LPIPS=1 \
 LPIPS_MAX_EDGE=512 \
 TRADEOFF_COMPRESSION_ROLES="high_quality balanced high_compression" \
 TRADEOFF_TILE_SIZES="256 512" \
-sbatch --mem=96G --export=ALL,REPO_DIR=/projects/bfod/yyang48/cdc-deltaai/code_main_641d86c \
+sbatch --mem=96G --export=ALL,REPO_DIR=/projects/bfod/USERNAME/cdc-deltaai/code_main_641d86c \
   experiments/compression/slurm/07_compression_tile_tradeoff.sbatch
 ```
