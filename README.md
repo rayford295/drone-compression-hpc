@@ -46,7 +46,6 @@ measured systems study of CDC reconstruction on HPC hardware.
 | `experiments/compression/` | Compression, reconstruction, detection, SAM, and summarization workflows. |
 | `results/` | CSV tables, summaries, and small visual examples from completed runs. |
 | `imgs/` | Public-facing figure panels for posters and summaries. |
-| `paper/` | Manuscript and SC26 submission materials. |
 | `sc26/` | Final PDFs uploaded for the SC26 submission. |
 | `xparam/`, `epsilonparam/` | CDC-derived model code paths used by the experiments. |
 

@@ -19,10 +19,6 @@ TILE512_HEATMAP = SRC_DIR / "100_0005_0001_tile512_error_heatmap.jpg"
 
 PANEL_PNG = OUT_DIR / "sc26_qualitative_256_512_visual_comparison.png"
 PANEL_JPG = OUT_DIR / "sc26_qualitative_256_512_visual_comparison.jpg"
-PAPER_FIGURES = [
-    REPO / "paper/figures/tile256_poster_panel.jpg",
-    REPO / "paper/submission/figures/tile256_poster_panel.jpg",
-]
 
 WIDTH, HEIGHT = 2541, 1419
 MAROON = "#500000"
@@ -183,10 +179,6 @@ def main() -> None:
     panel = build_panel()
     panel.save(PANEL_PNG)
     panel.save(PANEL_JPG, quality=95, subsampling=0)
-    for path in PAPER_FIGURES:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        panel.save(path, quality=95, subsampling=0)
-        print(path.relative_to(REPO))
     print(PANEL_PNG.relative_to(REPO))
     print(PANEL_JPG.relative_to(REPO))
 
